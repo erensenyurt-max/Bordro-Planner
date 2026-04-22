@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bordro Planner AI</title>
+    <title>Bordro Planner AI - Full Version</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #F4F7FB; }
-        .kanban-col { min-width: 320px; max-width: 320px; }
-        .card-done { opacity: 0.6; text-decoration: line-through; }
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
+        .kanban-col { min-width: 300px; max-width: 300px; }
+        .active-nav { background-color: #EEF2FF; color: #4F46E5; font-weight: 700; }
     </style>
 </head>
 <body>
@@ -18,115 +18,206 @@
         <aside class="w-64 bg-white border-r flex flex-col z-20">
             <div class="h-20 flex items-center px-6 border-b">
                 <div class="bg-indigo-600 p-2 rounded-lg mr-2 shadow-lg"><i data-lucide="sparkles" class="text-white w-5 h-5"></i></div>
-                <span class="font-extrabold text-lg text-indigo-600 tracking-tight">AI Planner</span>
+                <span class="font-extrabold text-lg text-indigo-600 tracking-tight">Planner AI</span>
             </div>
             <nav class="flex-1 p-4 space-y-2">
-                <div class="flex items-center gap-3 p-3 bg-indigo-50 text-indigo-700 rounded-xl font-bold cursor-pointer"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span>Pano Görünümü</span></div>
-                <div class="flex items-center gap-3 p-3 text-slate-500 hover:bg-slate-50 rounded-xl cursor-pointer"><i data-lucide="archive" class="w-5 h-5"></i><span>Arşivlenmiş İşler</span></div>
-                <div class="flex items-center gap-3 p-3 text-slate-500 hover:bg-slate-50 rounded-xl cursor-pointer"><i data-lucide="bar-chart-3" class="w-5 h-5"></i><span>Raporlar & Analiz</span></div>
-                <div class="flex items-center gap-3 p-3 text-slate-500 hover:bg-slate-50 rounded-xl cursor-pointer"><i data-lucide="users" class="w-5 h-5"></i><span>Ekipler</span></div>
+                <div onclick="switchTab('board')" id="nav-board" class="flex items-center gap-3 p-3 rounded-xl cursor-pointer active-nav transition-all">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i><span>Pano Görünümü</span>
+                </div>
+                <div onclick="switchTab('archive')" id="nav-archive" class="flex items-center gap-3 p-3 text-slate-500 hover:bg-slate-50 rounded-xl cursor-pointer transition-all">
+                    <i data-lucide="archive" class="w-5 h-5"></i><span>Arşivlenmiş İşler</span>
+                </div>
             </nav>
         </aside>
 
         <main class="flex-1 flex flex-col overflow-hidden">
             <header class="h-20 bg-white border-b flex items-center justify-between px-8 shrink-0">
-                <h1 class="text-xl font-bold">İş Takip Panosu</h1>
+                <h1 id="page-title" class="text-xl font-bold text-slate-800">İş Takip Panosu</h1>
                 <div class="flex items-center gap-4">
-                    <button class="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg flex items-center gap-2 border border-indigo-100 font-semibold hover:bg-indigo-100"><i data-lucide="sparkles" class="w-4 h-4"></i> AI Analiz</button>
-                    <button onclick="openModal()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 hover:bg-indigo-700"><i data-lucide="plus" class="w-4 h-4"></i> Yeni İş Ata</button>
-                    <div class="flex items-center gap-3 pl-4 border-l">
-                        <span class="text-xs font-bold text-slate-500">Hoş Geldiniz, Eren</span>
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Eren" class="w-10 h-10 rounded-full border-2 border-indigo-100" />
-                    </div>
+                    <button class="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg flex items-center gap-2 border border-indigo-100 font-semibold hover:bg-indigo-100 transition-all"><i data-lucide="sparkles" class="w-4 h-4"></i> AI Analiz</button>
+                    <button onclick="openModal('Todo')" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-indigo-100 flex items-center gap-2 hover:bg-indigo-700 transition-all"><i data-lucide="plus" class="w-4 h-4"></i> Yeni İş Ata</button>
                 </div>
             </header>
 
-            <div class="flex-1 overflow-x-auto p-6 bg-[#F4F7FB] flex gap-6">
-                <div class="kanban-col flex flex-col gap-4" ondrop="drop(event, 'Backlog')" ondragover="allowDrop(event)">
-                    <div class="flex items-center gap-2 font-bold text-xs text-slate-500 uppercase tracking-widest"><div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div> BACKLOG</div>
-                    <div id="Backlog" class="flex-1 space-y-3 min-h-[100px]"></div>
-                </div>
-                <div class="kanban-col flex flex-col gap-4" ondrop="drop(event, 'Todo')" ondragover="allowDrop(event)">
-                    <div class="flex items-center gap-2 font-bold text-xs text-slate-500 uppercase tracking-widest"><div class="w-2.5 h-2.5 rounded-full bg-amber-400"></div> TODO</div>
-                    <div id="Todo" class="flex-1 space-y-3 min-h-[100px]"></div>
-                </div>
-                <div class="kanban-col flex flex-col gap-4" ondrop="drop(event, 'InProgress')" ondragover="allowDrop(event)">
-                    <div class="flex items-center gap-2 font-bold text-xs text-slate-500 uppercase tracking-widest"><div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div> IN PROGRESS</div>
-                    <div id="InProgress" class="flex-1 space-y-3 min-h-[100px]"></div>
-                </div>
-                <div class="kanban-col flex flex-col gap-4" ondrop="drop(event, 'Done')" ondragover="allowDrop(event)">
-                    <div class="flex items-center gap-2 font-bold text-xs text-slate-500 uppercase tracking-widest"><div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> DONE</div>
-                    <div id="Done" class="flex-1 space-y-3 min-h-[100px]"></div>
-                </div>
+            <div id="board-view" class="flex-1 overflow-x-auto p-6 flex gap-6">
+                <template id="col-template">
+                    <div class="kanban-col flex flex-col gap-4">
+                        <div class="flex items-center justify-between px-1">
+                            <div class="flex items-center gap-2 font-bold text-[11px] text-slate-400 uppercase tracking-widest">
+                                <div class="status-dot w-2 h-2 rounded-full"></div>
+                                <span class="col-name"></span>
+                                <span class="col-count ml-1 opacity-50">0</span>
+                            </div>
+                            <button class="add-btn text-slate-400 hover:text-indigo-600"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                        </div>
+                        <div class="task-list flex-1 space-y-3 min-h-[150px] p-1 rounded-xl transition-colors" ondragover="allowDrop(event)" ondrop="drop(event)"></div>
+                    </div>
+                </template>
+            </div>
+
+            <div id="archive-view" class="hidden flex-1 p-8 overflow-y-auto">
+                <div class="max-w-4xl mx-auto space-y-4" id="archive-list">
+                    </div>
             </div>
         </main>
     </div>
 
-    <div id="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div class="bg-white w-[450px] p-8 rounded-3xl shadow-2xl">
-            <h2 class="text-xl font-bold mb-6">Yeni İş Ata</h2>
-            <input id="task-title" type="text" placeholder="İş başlığı..." class="w-full p-3 bg-slate-50 border rounded-xl mb-4 outline-none focus:ring-2 ring-indigo-500">
-            <textarea id="task-desc" placeholder="Açıklama..." class="w-full p-3 bg-slate-50 border rounded-xl h-24 mb-4 outline-none"></textarea>
-            <div class="flex justify-end gap-3 mt-4">
-                <button onclick="closeModal()" class="px-6 py-2 text-slate-400 font-bold">Vazgeç</button>
-                <button onclick="addTask()" class="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-indigo-700">Kaydet</button>
+    <div id="modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-white w-[450px] p-8 rounded-3xl shadow-2xl border border-slate-100">
+            <h2 class="text-xl font-bold mb-6 text-slate-800">Yeni Görev Oluştur</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Başlık</label>
+                    <input id="task-title" type="text" class="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl outline-none focus:ring-2 ring-indigo-500 transition-all">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Açıklama</label>
+                    <textarea id="task-desc" class="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl h-24 outline-none focus:ring-2 ring-indigo-500 transition-all"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-8">
+                <button onclick="closeModal()" class="px-6 py-2 text-slate-400 font-bold hover:text-slate-600">Vazgeç</button>
+                <button onclick="addTask()" class="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100">Görevi Ekle</button>
             </div>
         </div>
     </div>
 
     <script>
-        let tasks = JSON.parse(localStorage.getItem('bordroTasks')) || [
-            { id: '1', title: 'Örnek: Bordro Analizi', desc: 'Sistemi test etmek için ilk görev.', status: 'Todo', date: '24.04' }
-        ];
+        const COL_CONFIG = {
+            'Backlog': { color: 'bg-slate-400', label: 'Backlog' },
+            'Todo': { color: 'bg-amber-400', label: 'Yapılacaklar' },
+            'InProgress': { color: 'bg-blue-500', label: 'Devam Edenler' },
+            'Done': { color: 'bg-emerald-500', label: 'Tamamlananlar' }
+        };
 
-        function renderTasks() {
-            const cols = ['Backlog', 'Todo', 'InProgress', 'Done'];
-            cols.forEach(col => document.getElementById(col).innerHTML = '');
+        let tasks = JSON.parse(localStorage.getItem('bordroTasks')) || [
+            { id: '1', title: 'Örnek: Bordro Analizi', desc: 'Sistemi test etmek için ilk görev.', status: 'Todo', date: '24.04', archived: false }
+        ];
+        
+        let activeTab = 'board';
+        let targetStatus = 'Todo';
+
+        function render() {
+            const board = document.getElementById('board-view');
+            const archiveList = document.getElementById('archive-list');
+            const template = document.getElementById('col-template');
             
-            tasks.forEach(task => {
-                const card = document.createElement('div');
-                card.className = `bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-grab active:cursor-grabbing hover:border-indigo-300 transition-all ${task.status === 'Done' ? 'card-done' : ''}`;
-                card.draggable = true;
-                card.id = task.id;
-                card.ondragstart = (e) => e.dataTransfer.setData('text', task.id);
-                card.innerHTML = `
-                    <h4 class="text-sm font-bold text-slate-800">${task.title}</h4>
-                    <p class="text-[10px] text-slate-500 mt-1">${task.desc}</p>
-                    <div class="mt-4 flex items-center justify-between border-t pt-3">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">📅 ${task.date}</span>
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Pinar" class="w-5 h-5 rounded-full" />
-                    </div>
-                `;
-                document.getElementById(task.status).appendChild(card);
-            });
+            board.innerHTML = '';
+            archiveList.innerHTML = '';
+
+            if (activeTab === 'board') {
+                Object.keys(COL_CONFIG).forEach(status => {
+                    const clone = template.content.cloneNode(true);
+                    const colDiv = clone.querySelector('.kanban-col');
+                    const listDiv = clone.querySelector('.task-list');
+                    
+                    clone.querySelector('.status-dot').classList.add(COL_CONFIG[status].color);
+                    clone.querySelector('.col-name').textContent = COL_CONFIG[status].label;
+                    clone.querySelector('.add-btn').onclick = () => openModal(status);
+                    listDiv.id = status;
+
+                    const colTasks = tasks.filter(t => t.status === status && !t.archived);
+                    clone.querySelector('.col-count').textContent = colTasks.length;
+
+                    colTasks.forEach(task => {
+                        listDiv.appendChild(createCard(task));
+                    });
+
+                    board.appendChild(clone);
+                });
+            } else {
+                const archivedTasks = tasks.filter(t => t.archived);
+                if (archivedTasks.length === 0) {
+                    archiveList.innerHTML = '<div class="text-center py-20 text-slate-400 font-medium">Henüz arşivlenmiş iş yok.</div>';
+                }
+                archivedTasks.forEach(task => {
+                    const item = document.createElement('div');
+                    item.className = "bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between";
+                    item.innerHTML = `
+                        <div>
+                            <h4 class="font-bold text-slate-800">${task.title}</h4>
+                            <p class="text-sm text-slate-500">${task.desc}</p>
+                        </div>
+                        <button onclick="unarchive('${task.id}')" class="text-indigo-600 font-bold text-xs hover:underline text-right">Panoya Geri Al</button>
+                    `;
+                    archiveList.appendChild(item);
+                });
+            }
             localStorage.setItem('bordroTasks', JSON.stringify(tasks));
             lucide.createIcons();
         }
 
-        function allowDrop(e) { e.preventDefault(); }
-        function drop(e, status) {
-            e.preventDefault();
-            const id = e.dataTransfer.getData('text');
-            const task = tasks.find(t => t.id === id);
-            if (task) { task.status = status; renderTasks(); }
+        function createCard(task) {
+            const card = document.createElement('div');
+            card.className = `bg-white p-4 rounded-2xl border border-slate-100 shadow-sm cursor-grab active:cursor-grabbing hover:border-indigo-300 transition-all group`;
+            card.draggable = true;
+            card.id = task.id;
+            card.ondragstart = (e) => {
+                e.dataTransfer.setData('text', task.id);
+                card.classList.add('opacity-50');
+            };
+            card.ondragend = () => card.classList.remove('opacity-50');
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-2">
+                    <h4 class="text-sm font-bold text-slate-800 leading-tight">${task.title}</h4>
+                    <button onclick="deleteTask('${task.id}')" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+                <p class="text-[11px] text-slate-500 line-clamp-2">${task.desc || 'Açıklama yok.'}</p>
+                <div class="mt-4 flex items-center justify-between border-t border-slate-50 pt-3">
+                    <span class="text-[10px] font-bold text-slate-300">📅 ${task.date}</span>
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Eren" class="w-6 h-6 rounded-full grayscale hover:grayscale-0 transition-all" />
+                </div>
+            `;
+            return card;
         }
 
-        function openModal() { document.getElementById('modal').classList.remove('hidden'); }
+        function allowDrop(e) { e.preventDefault(); e.currentTarget.classList.add('bg-indigo-50/50'); }
+        function drop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('bg-indigo-50/50');
+            const id = e.dataTransfer.getData('text');
+            const status = e.currentTarget.id;
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                task.status = status;
+                if (status === 'Done') task.archived = true;
+                render();
+            }
+        }
+
+        function switchTab(tab) {
+            activeTab = tab;
+            document.getElementById('nav-board').classList.toggle('active-nav', tab === 'board');
+            document.getElementById('nav-archive').classList.toggle('active-nav', tab === 'archive');
+            document.getElementById('board-view').classList.toggle('hidden', tab !== 'board');
+            document.getElementById('archive-view').classList.toggle('hidden', tab !== 'archive');
+            document.getElementById('page-title').textContent = tab === 'board' ? 'İş Takip Panosu' : 'Arşivlenmiş İşler';
+            render();
+        }
+
+        function openModal(status) { targetStatus = status; document.getElementById('modal').classList.remove('hidden'); }
         function closeModal() { document.getElementById('modal').classList.add('hidden'); }
 
         function addTask() {
             const title = document.getElementById('task-title').value;
             const desc = document.getElementById('task-desc').value;
             if (!title) return;
-            const newTask = { id: Date.now().toString(), title, desc, status: 'Todo', date: '22.04' };
-            tasks.push(newTask);
-            renderTasks();
-            closeModal();
-            document.getElementById('task-title').value = '';
-            document.getElementById('task-desc').value = '';
+            tasks.push({ id: Date.now().toString(), title, desc, status: targetStatus, date: '22.04', archived: false });
+            render(); closeModal();
+            document.getElementById('task-title').value = ''; document.getElementById('task-desc').value = '';
         }
 
-        renderTasks();
+        function unarchive(id) {
+            const task = tasks.find(t => t.id === id);
+            if (task) { task.archived = false; task.status = 'Todo'; render(); }
+        }
+
+        function deleteTask(id) {
+            tasks = tasks.filter(t => t.id !== id);
+            render();
+        }
+
+        render();
     </script>
 </body>
 </html>
