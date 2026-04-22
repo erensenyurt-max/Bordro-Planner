@@ -3,323 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bordro Planner - Standalone Edition</title>
-    <!-- Tailwind CSS Play CDN -->
+    <title>Bordro Planner AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        .card-shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1); }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #F4F7FB; }
+        .kanban-col { min-width: 320px; max-width: 320px; }
+        .card-done { opacity: 0.6; text-decoration: line-through; }
     </style>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#4F46E5',
-                        foreground: '#1E293B',
-                        background: '#FFFFFF',
-                        muted: '#F8FAFC',
-                    }
-                }
-            }
-        }
-    </script>
 </head>
-<body class="bg-[#F4F7FB] text-slate-800">
-    <div id="root">
-        <div class="flex h-screen w-full items-center justify-center bg-white">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+<body>
+    <div id="app" class="flex h-screen overflow-hidden">
+        <aside class="w-64 bg-white border-r flex flex-col z-20">
+            <div class="h-20 flex items-center px-6 border-b">
+                <div class="bg-indigo-600 p-2 rounded-lg mr-2 shadow-lg"><i data-lucide="sparkles" class="text-white w-5 h-5"></i></div>
+                <span class="font-extrabold text-lg text-indigo-600 tracking-tight">AI Planner</span>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <div class="flex items-center gap-3 p-3 bg-indigo-50 text-indigo-700 rounded-xl font-bold cursor-pointer"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span>Pano Görünümü</span></div>
+                <div class="flex items-center gap-3 p-3 text-slate-500 hover:bg-slate-50 rounded-xl cursor-pointer"><i data-lucide="archive" class="w-5 h-5"></i><span>Arşivlenmiş İşler</span></div>
+                <div class="flex items-center gap-3 p-3 text-slate-500 hover:bg-slate-50 rounded-xl cursor-pointer"><i data-lucide="bar-chart-3" class="w-5 h-5"></i><span>Raporlar & Analiz</span></div>
+                <div class="flex items-center gap-3 p-3 text-slate-500 hover:bg-slate-50 rounded-xl cursor-pointer"><i data-lucide="users" class="w-5 h-5"></i><span>Ekipler</span></div>
+            </nav>
+        </aside>
+
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <header class="h-20 bg-white border-b flex items-center justify-between px-8 shrink-0">
+                <h1 class="text-xl font-bold">İş Takip Panosu</h1>
+                <div class="flex items-center gap-4">
+                    <button class="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg flex items-center gap-2 border border-indigo-100 font-semibold hover:bg-indigo-100"><i data-lucide="sparkles" class="w-4 h-4"></i> AI Analiz</button>
+                    <button onclick="openModal()" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-indigo-200 flex items-center gap-2 hover:bg-indigo-700"><i data-lucide="plus" class="w-4 h-4"></i> Yeni İş Ata</button>
+                    <div class="flex items-center gap-3 pl-4 border-l">
+                        <span class="text-xs font-bold text-slate-500">Hoş Geldiniz, Eren</span>
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Eren" class="w-10 h-10 rounded-full border-2 border-indigo-100" />
+                    </div>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-x-auto p-6 bg-[#F4F7FB] flex gap-6">
+                <div class="kanban-col flex flex-col gap-4" ondrop="drop(event, 'Backlog')" ondragover="allowDrop(event)">
+                    <div class="flex items-center gap-2 font-bold text-xs text-slate-500 uppercase tracking-widest"><div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div> BACKLOG</div>
+                    <div id="Backlog" class="flex-1 space-y-3 min-h-[100px]"></div>
+                </div>
+                <div class="kanban-col flex flex-col gap-4" ondrop="drop(event, 'Todo')" ondragover="allowDrop(event)">
+                    <div class="flex items-center gap-2 font-bold text-xs text-slate-500 uppercase tracking-widest"><div class="w-2.5 h-2.5 rounded-full bg-amber-400"></div> TODO</div>
+                    <div id="Todo" class="flex-1 space-y-3 min-h-[100px]"></div>
+                </div>
+                <div class="kanban-col flex flex-col gap-4" ondrop="drop(event, 'InProgress')" ondragover="allowDrop(event)">
+                    <div class="flex items-center gap-2 font-bold text-xs text-slate-500 uppercase tracking-widest"><div class="w-2.5 h-2.5 rounded-full bg-blue-500"></div> IN PROGRESS</div>
+                    <div id="InProgress" class="flex-1 space-y-3 min-h-[100px]"></div>
+                </div>
+                <div class="kanban-col flex flex-col gap-4" ondrop="drop(event, 'Done')" ondragover="allowDrop(event)">
+                    <div class="flex items-center gap-2 font-bold text-xs text-slate-500 uppercase tracking-widest"><div class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> DONE</div>
+                    <div id="Done" class="flex-1 space-y-3 min-h-[100px]"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-white w-[450px] p-8 rounded-3xl shadow-2xl">
+            <h2 class="text-xl font-bold mb-6">Yeni İş Ata</h2>
+            <input id="task-title" type="text" placeholder="İş başlığı..." class="w-full p-3 bg-slate-50 border rounded-xl mb-4 outline-none focus:ring-2 ring-indigo-500">
+            <textarea id="task-desc" placeholder="Açıklama..." class="w-full p-3 bg-slate-50 border rounded-xl h-24 mb-4 outline-none"></textarea>
+            <div class="flex justify-end gap-3 mt-4">
+                <button onclick="closeModal()" class="px-6 py-2 text-slate-400 font-bold">Vazgeç</button>
+                <button onclick="addTask()" class="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold hover:bg-indigo-700">Kaydet</button>
+            </div>
         </div>
     </div>
 
-    <!-- React and Libraries via ESM.sh -->
-    <script type="module">
-        import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@19';
-        import ReactDOM from 'https://esm.sh/react-dom@19/client';
-        import * as Lucide from 'https://esm.sh/lucide-react@0.344.0';
-        import { motion, AnimatePresence } from 'https://esm.sh/framer-motion@11';
-        import { 
-            DndContext, 
-            closestCorners, 
-            KeyboardSensor, 
-            PointerSensor, 
-            useSensor, 
-            useSensors,
-            DragOverlay,
-            defaultDropAnimationSideEffects,
-            useDroppable
-        } from 'https://esm.sh/@dnd-kit/core@6';
-        import { 
-            arrayMove, 
-            SortableContext, 
-            sortableKeyboardCoordinates, 
-            verticalListSortingStrategy,
-            useSortable
-        } from 'https://esm.sh/@dnd-kit/sortable@8';
-        import { CSS } from 'https://esm.sh/@dnd-kit/utilities@3';
+    <script>
+        let tasks = JSON.parse(localStorage.getItem('bordroTasks')) || [
+            { id: '1', title: 'Örnek: Bordro Analizi', desc: 'Sistemi test etmek için ilk görev.', status: 'Todo', date: '24.04' }
+        ];
 
-        // --- Configuration ---
-        const GEMINI_API_KEY = ""; // Buraya API anahtarınızı ekleyebilirsiniz
-        const STORAGE_KEY = "bordro_planner_data";
-        const COLUMNS = ["Backlog", "Todo", "In Progress", "Done"];
-
-        // --- Data Layer (LocalStorage) ---
-        const initialData = {
-            tasks: [],
-            users: [
-                { id: "1", name: "Burcu Gülbaz Ünlü", email: "burcu@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Burcu" },
-                { id: "2", name: "Ebru Bulut", email: "ebru@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ebru" },
-                { id: "3", name: "Eren Şenyurt", email: "eren@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Eren" },
-                { id: "4", name: "Oğuz Güleç", email: "oguz@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Oguz" },
-                { id: "5", name: "Pınar Zengin", email: "pinar@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Pinar" },
-                { id: "6", name: "Yasin Alper", email: "yasin@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Yasin" },
-            ]
-        };
-
-        const getLocalData = () => {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            return stored ? JSON.parse(stored) : initialData;
-        };
-
-        const saveLocalData = (data) => {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        };
-
-        // --- Components ---
-
-        const TaskCard = ({ task, users, onMove, onDelete, onUnarchive }) => {
-            const assignedUsers = users.filter(u => task.assignedTo?.includes(u.id));
-            const isDone = task.status === 'Done';
-            const isArchived = task.isArchived;
-
-            return (
-                <motion.div layout className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:border-indigo-300 transition-all cursor-grab active:cursor-grabbing mb-2">
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); onMove(task, isDone ? 'Todo' : 'Done'); }}
-                                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${isDone ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 hover:border-indigo-400'}`}
-                            >
-                                {isDone && <Lucide.Check className="h-2.5 w-2.5 text-white" />}
-                            </button>
-                            <h4 className={`text-[12px] font-bold truncate ${isDone ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
-                                {task.title}
-                            </h4>
-                        </div>
-                        <button onClick={() => onDelete(task.id)} className="text-slate-300 hover:text-red-500">
-                           <Lucide.Trash2 className="h-3 w-3" />
-                        </button>
+        function renderTasks() {
+            const cols = ['Backlog', 'Todo', 'InProgress', 'Done'];
+            cols.forEach(col => document.getElementById(col).innerHTML = '');
+            
+            tasks.forEach(task => {
+                const card = document.createElement('div');
+                card.className = `bg-white p-4 rounded-xl border border-slate-200 shadow-sm cursor-grab active:cursor-grabbing hover:border-indigo-300 transition-all ${task.status === 'Done' ? 'card-done' : ''}`;
+                card.draggable = true;
+                card.id = task.id;
+                card.ondragstart = (e) => e.dataTransfer.setData('text', task.id);
+                card.innerHTML = `
+                    <h4 class="text-sm font-bold text-slate-800">${task.title}</h4>
+                    <p class="text-[10px] text-slate-500 mt-1">${task.desc}</p>
+                    <div class="mt-4 flex items-center justify-between border-t pt-3">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">📅 ${task.date}</span>
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Pinar" class="w-5 h-5 rounded-full" />
                     </div>
-                    {task.description && <p className="text-[10px] text-slate-500 line-clamp-1 mb-3">{task.description}</p>}
-                    <div className="flex items-center justify-between border-t border-slate-50 pt-2 mt-1">
-                        <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
-                            <Lucide.Calendar className="h-2.5 w-2.5 text-indigo-400" />
-                            <span>{task.dueDate?.split('T')[0] || '---'}</span>
-                        </div>
-                        <div className="flex -space-x-1.5 grayscale-[0.5]">
-                            {assignedUsers.map(u => (
-                                <img key={u.id} src={u.avatar} className="h-4 w-4 rounded-full border border-white" title={u.name} />
-                            ))}
-                        </div>
-                    </div>
-                </motion.div>
-            );
-        };
-
-        const SortableTaskCard = (props) => {
-            const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.task.id });
-            const style = { transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.3 : 1 };
-            return <div ref={setNodeRef} style={style} {...attributes} {...listeners}><TaskCard {...props} /></div>;
-        };
-
-        const DroppableColumn = ({ id, title, tasksCount, children, isActive }) => {
-            const { setNodeRef, isOver } = useDroppable({ id });
-            return (
-                <div ref={setNodeRef} className={`flex-1 min-w-[250px] max-w-[320px] flex flex-col gap-3 rounded-2xl p-2 transition-all ${isOver ? 'bg-indigo-50 ring-2 ring-indigo-100' : ''}`}>
-                    <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${title === 'Backlog' ? 'bg-slate-400' : title === 'Todo' ? 'bg-amber-400' : title === 'In Progress' ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
-                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">{title}</span>
-                            <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-bold">{tasksCount}</span>
-                        </div>
-                    </div>
-                    <div className="flex-1">{children}</div>
-                </div>
-            );
-        };
-
-        // --- Main App ---
-
-        function App() {
-            const [data, setData] = useState({ tasks: [], users: [] });
-            const [activeTab, setActiveTab] = useState('board');
-            const [showArchived, setShowArchived] = useState(false);
-            const [search, setSearch] = useState("");
-            const [activeId, setActiveId] = useState(null);
-            const [isModalOpen, setIsModalOpen] = useState(false);
-            const [filterUserIds, setFilterUserIds] = useState([]);
-
-            const [newTask, setNewTask] = useState({ title: "", description: "", status: "Todo", priority: "Medium", assignedTo: [], dueDate: "" });
-
-            useEffect(() => {
-                setData(getLocalData());
-            }, []);
-
-            useEffect(() => {
-                if (data.users.length > 0) saveLocalData(data);
-            }, [data]);
-
-            const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
-
-            const handleAddTask = () => {
-                if (!newTask.title) return;
-                const taskToAdd = { ...newTask, id: Math.random().toString(36).substring(2, 9), createdAt: new Date().toISOString(), isArchived: false };
-                if (taskToAdd.status === 'Done') taskToAdd.isArchived = true;
-                setData(prev => ({ ...prev, tasks: [...prev.tasks, taskToAdd] }));
-                setIsModalOpen(false);
-                setNewTask({ title: "", description: "", status: "Todo", priority: "Medium", assignedTo: [], dueDate: "" });
-            };
-
-            const handleMoveTask = (task, newStatus) => {
-                setData(prev => ({
-                    ...prev,
-                    tasks: prev.tasks.map(t => t.id === task.id ? { ...t, status: newStatus, isArchived: newStatus === 'Done' } : t)
-                }));
-            };
-
-            const handleDelete = (id) => {
-                setData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }));
-            };
-
-            const filteredTasks = data.tasks.filter(t => {
-                const matchesSearch = t.title.toLowerCase().includes(search.toLowerCase());
-                const matchesUser = filterUserIds.length === 0 || t.assignedTo?.some(uid => filterUserIds.includes(uid));
-                const matchesTab = showArchived ? t.isArchived : !t.isArchived;
-                return matchesSearch && matchesUser && matchesTab;
+                `;
+                document.getElementById(task.status).appendChild(card);
             });
-
-            // DnD Handlers
-            const handleDragEnd = (event) => {
-                const { active, over } = event;
-                if (!over) return;
-                const activeTask = data.tasks.find(t => t.id === active.id);
-                if (!activeTask) return;
-                const newStatus = COLUMNS.includes(over.id) ? over.id : data.tasks.find(t => t.id === over.id)?.status;
-                if (newStatus && activeTask.status !== newStatus) {
-                    handleMoveTask(activeTask, newStatus);
-                }
-                setActiveId(null);
-            };
-
-            return (
-                <div className="flex h-screen w-full overflow-hidden bg-[#F4F7FB]">
-                    <!-- Sidebar -->
-                    <div className="w-64 bg-white border-r flex flex-col p-4 shrink-0">
-                        <div className="flex items-center gap-2 mb-10 px-2 mt-2">
-                            <div className="bg-indigo-600 p-1.5 rounded-lg text-white"><Lucide.Sparkles className="h-5 w-5" /></div>
-                            <span className="font-extrabold text-lg text-indigo-700 tracking-tighter">Bordro Planner</span>
-                        </div>
-                        <nav className="flex-1 space-y-2">
-                            <button onClick={() => {setShowArchived(false); setActiveTab('board');}} className={`flex items-center gap-3 w-full p-3 rounded-xl text-sm font-bold transition-all ${!showArchived ? 'bg-indigo-50 text-indigo-700' : 'text-slate-400 hover:bg-slate-50'}`}>
-                                <Lucide.LayoutDashboard className="h-5 w-5" /> Pano Görünümü
-                            </button>
-                            <button onClick={() => setShowArchived(true)} className={`flex items-center gap-3 w-full p-3 rounded-xl text-sm font-bold transition-all ${showArchived ? 'bg-indigo-50 text-indigo-700' : 'text-slate-400 hover:bg-slate-50'}`}>
-                                <Lucide.Archive className="h-5 w-5" /> Arşivlenmiş İşler
-                            </button>
-                        </nav>
-                        <div className="bg-indigo-600 rounded-2xl p-4 text-white text-[11px]">
-                            <p className="opacity-80 mb-2">Bordro takip sürecini hızlandırmak için yapay zeka analizini kullanın.</p>
-                            <button className="bg-white/20 hover:bg-white/30 w-full py-2 rounded-lg font-bold transition-all">Rapor Oluştur</button>
-                        </div>
-                    </div>
-
-                    <!-- Main -->
-                    <div className="flex-1 flex flex-col overflow-hidden">
-                        <header className="h-20 border-b bg-white flex items-center justify-between px-8 shrink-0">
-                            <div className="flex items-center gap-4">
-                                <h1 className="text-xl font-extrabold text-slate-800">Bordro Takip Panosu</h1>
-                                <div className="relative">
-                                    <Lucide.Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                    <input value={search} onChange={(e)=>setSearch(e.target.value)} border-none placeholder="İşlerde ara..." className="pl-10 h-10 w-64 bg-slate-50 rounded-full border-none focus:ring-2 focus:ring-indigo-100 outline-none text-sm" />
-                                </div>
-                            </div>
-                            <button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-100 transition-all text-sm">
-                                <Lucide.Plus className="h-4 w-4" /> Yeni İş Ata
-                            </button>
-                        </header>
-
-                        <div className="flex-1 overflow-x-auto p-8">
-                            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd} onDragStart={(e)=>setActiveId(e.active.id)}>
-                                <div className="flex gap-6 h-full min-w-max">
-                                    {COLUMNS.map(col => (
-                                        <DroppableColumn key={col} id={col} title={col} tasksCount={filteredTasks.filter(t=>t.status===col).length} isActive={activeId !== null}>
-                                            <SortableContext items={filteredTasks.filter(t=>t.status===col).map(t=>t.id)} strategy={verticalListSortingStrategy}>
-                                                <div className="min-h-[200px]">
-                                                    {filteredTasks.filter(t=>t.status===col).map(task => (
-                                                        <SortableTaskCard key={task.id} task={task} users={data.users} onMove={handleMoveTask} onDelete={handleDelete} />
-                                                    ))}
-                                                </div>
-                                            </SortableContext>
-                                        </DroppableColumn>
-                                    ))}
-                                </div>
-                            </DndContext>
-                        </div>
-                    </div>
-
-                    <!-- Modal -->
-                    {isModalOpen && (
-                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl scale-in">
-                                <h3 className="text-xl font-extrabold mb-4">Yeni İş Detayları</h3>
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">İş Başlığı</label>
-                                        <input value={newTask.title} onChange={(e)=>setNewTask({...newTask, title: e.target.value})} className="w-full h-11 border bg-slate-50 border-slate-100 rounded-xl px-4 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Örn: Mart Ayı Bordro Hazırlığı" />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Sorumlular</label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {data.users.map(u => (
-                                                <button key={u.id} onClick={()=>{
-                                                    const current = newTask.assignedTo;
-                                                    setNewTask({...newTask, assignedTo: current.includes(u.id) ? current.filter(id=>id!==u.id) : [...current, u.id]})
-                                                }} className={`flex items-center gap-2 border px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${newTask.assignedTo.includes(u.id) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-100 hover:bg-slate-50'}`}>
-                                                    <img src={u.avatar} className="h-4 w-4" /> {u.name.split(' ')[0]}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-4">
-                                        <div className="flex-1">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Termin</label>
-                                            <input type="date" value={newTask.dueDate} onChange={(e)=>setNewTask({...newTask, dueDate: e.target.value})} className="w-full h-11 border bg-slate-50 border-slate-100 rounded-xl px-4 outline-none focus:ring-2 focus:ring-indigo-100" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Durum</label>
-                                            <select value={newTask.status} onChange={(e)=>setNewTask({...newTask, status: e.target.value})} className="w-full h-11 border bg-slate-50 border-slate-100 rounded-xl px-4 outline-none">
-                                                {COLUMNS.map(c => <option key={c} value={c}>{c}</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="mt-8 flex gap-3">
-                                    <button onClick={() => setIsModalOpen(false)} className="flex-1 h-11 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all">İptal</button>
-                                    <button onClick={handleAddTask} className="flex-1 h-11 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">Kaydet</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
+            localStorage.setItem('bordroTasks', JSON.stringify(tasks));
+            lucide.createIcons();
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
+        function allowDrop(e) { e.preventDefault(); }
+        function drop(e, status) {
+            e.preventDefault();
+            const id = e.dataTransfer.getData('text');
+            const task = tasks.find(t => t.id === id);
+            if (task) { task.status = status; renderTasks(); }
+        }
+
+        function openModal() { document.getElementById('modal').classList.remove('hidden'); }
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+
+        function addTask() {
+            const title = document.getElementById('task-title').value;
+            const desc = document.getElementById('task-desc').value;
+            if (!title) return;
+            const newTask = { id: Date.now().toString(), title, desc, status: 'Todo', date: '22.04' };
+            tasks.push(newTask);
+            renderTasks();
+            closeModal();
+            document.getElementById('task-title').value = '';
+            document.getElementById('task-desc').value = '';
+        }
+
+        renderTasks();
     </script>
 </body>
 </html>
