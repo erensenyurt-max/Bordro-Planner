@@ -1,981 +1,325 @@
-import * as React from "react";
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreHorizontal, 
-  Calendar as CalendarIcon, 
-  User as UserIcon, 
-  CheckCircle2, 
-  Check,
-  Circle, 
-  LayoutDashboard, 
-  ListTodo, 
-  BarChart3, 
-  Settings,
-  Menu,
-  ChevronRight,
-  ChevronLeft,
-  ChevronDown,
-  Sparkles,
-  FileText,
-  Loader2,
-  Trash2,
-  Archive,
-  ArrowRightLeft,
-  Undo2
-} from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
-import { 
-  DndContext, 
-  closestCorners, 
-  KeyboardSensor, 
-  PointerSensor, 
-  useSensor, 
-  useSensors,
-  DragOverlay,
-  defaultDropAnimationSideEffects,
-  DragStartEvent,
-  DragOverEvent,
-  DragEndEvent,
-  useDroppable
-} from '@dnd-kit/core';
-import { 
-  arrayMove, 
-  SortableContext, 
-  sortableKeyboardCoordinates, 
-  verticalListSortingStrategy,
-  useSortable
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle,
-  DialogTrigger
-} from "@/components/ui/dialog";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
-import { Task, User, Status, Priority } from "./types";
-import { 
-  fetchData, 
-  createTask, 
-  updateTask, 
-  deleteTask, 
-  generateReport, 
-  suggestTasks 
-} from "./services";
-import { format } from "date-fns";
-
-const COLUMNS: Status[] = ["Backlog", "Todo", "In Progress", "Done"];
-
-export default function App() {
-  const [data, setData] = React.useState<{ tasks: Task[]; users: User[] }>({ tasks: [], users: [] });
-  const [loading, setLoading] = React.useState(true);
-  const [search, setSearch] = React.useState("");
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
-  const [activeTab, setActiveTab] = React.useState("board");
-  
-  const [filterUserIds, setFilterUserIds] = React.useState<string[]>([]);
-  const [showArchived, setShowArchived] = React.useState(false);
-  
-  // dnd-kit sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const [activeId, setActiveId] = React.useState<string | null>(null);
-
-  // Quick Add states
-  const [quickAddStatus, setQuickAddStatus] = React.useState<Status | null>(null);
-  
-  // Dialog states
-  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
-  const [isReportDialogOpen, setIsReportDialogOpen] = React.useState(false);
-  const [report, setReport] = React.useState("");
-  const [generatingReport, setGeneratingReport] = React.useState(false);
-  
-  const [newTask, setNewTask] = React.useState<Partial<Task>>({
-    title: "",
-    description: "",
-    status: "Todo",
-    priority: "Medium",
-    assignedTo: [],
-    dueDate: new Date().toISOString(),
-  });
-
-  const loadData = async () => {
-    try {
-      const result = await fetchData();
-      setData(result);
-    } catch (error) {
-      console.error("Failed to load data", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  React.useEffect(() => {
-    loadData();
-  }, []);
-
-  const handleAddTask = async (customTask?: Partial<Task>) => {
-    const taskToCreate = {
-      ...newTask,
-      ...customTask,
-      status: customTask?.status || newTask.status || "Todo",
-    };
-    if (!taskToCreate.title) return;
-    try {
-      await createTask(taskToCreate);
-      setIsAddDialogOpen(false);
-      setQuickAddStatus(null);
-      setNewTask({ 
-        title: "", 
-        description: "", 
-        status: "Todo", 
-        priority: "Medium", 
-        assignedTo: [], 
-        dueDate: new Date().toISOString() 
-      });
-      loadData();
-    } catch (error) {
-      console.error("Failed to add task", error);
-    }
-  };
-
-  const handleMoveTask = async (task: Task, newStatus: Status) => {
-    try {
-      const updates: Partial<Task> = { status: newStatus };
-      // Auto-archive if moved to Done
-      if (newStatus === 'Done') {
-        updates.isArchived = true;
-      } else {
-        updates.isArchived = false;
-      }
-      await updateTask(task.id, updates);
-      loadData();
-    } catch (error) {
-      console.error("Failed to move task", error);
-    }
-  };
-
-  const handleUnarchive = async (id: string) => {
-    try {
-      await updateTask(id, { isArchived: false, status: 'Todo' });
-      loadData();
-    } catch (error) {
-      console.error("Failed to unarchive task", error);
-    }
-  };
-
-  const handleDeleteTask = async (id: string) => {
-    try {
-      await deleteTask(id);
-      loadData();
-    } catch (error) {
-      console.error("Failed to delete task", error);
-    }
-  };
-
-  const handleGenerateReport = async () => {
-    setGeneratingReport(true);
-    setIsReportDialogOpen(true);
-    try {
-      const result = await generateReport(data.tasks);
-      setReport(result || "Rapor oluşturulamadı.");
-    } catch (error) {
-      setReport("Rapor oluşturulurken bir hata oluştu.");
-    } finally {
-      setGeneratingReport(false);
-    }
-  };
-
-  const toggleUserFilter = (userId: string) => {
-    setFilterUserIds(prev => 
-      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-    );
-  };
-
-  const filteredTasks = data.tasks.filter((task) => {
-    const matchesSearch = task.title.toLowerCase().includes(search.toLowerCase()) || 
-                          (task.description && task.description.toLowerCase().includes(search.toLowerCase()));
-    
-    const matchesUser = filterUserIds.length === 0 || 
-                        (task.assignedTo && task.assignedTo.some(id => filterUserIds.includes(id)));
-    
-    const matchesArchive = showArchived ? task.isArchived === true : !task.isArchived;
-
-    return matchesSearch && matchesUser && matchesArchive;
-  });
-
-  const getTasksByStatus = (status: Status) => {
-    return filteredTasks.filter((task) => task.status === status);
-  };
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeId = active.id;
-    const overId = over.id;
-
-    if (activeId === overId) return;
-
-    // Find the task and the column it's being dragged to
-    const activeTask = data.tasks.find(t => t.id === activeId);
-    if (!activeTask) return;
-
-    // If overId is a column ID
-    if (COLUMNS.includes(overId as Status)) {
-      const overStatus = overId as Status;
-      if (activeTask.status !== overStatus) {
-        // Optimistically update local state for smoother transition
-        setData(prev => ({
-          ...prev,
-          tasks: prev.tasks.map(t => t.id === activeId ? { ...t, status: overStatus } : t)
-        }));
-      }
-      return;
-    }
-
-    // If overId is another task ID
-    const overTask = data.tasks.find(t => t.id === overId);
-    if (!overTask) return;
-
-    if (activeTask.status !== overTask.status) {
-       setData(prev => ({
-          ...prev,
-          tasks: prev.tasks.map(t => t.id === activeId ? { ...t, status: overTask.status } : t)
-        }));
-    }
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    setActiveId(null);
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeId = active.id;
-    const overId = over.id;
-
-    const activeTask = data.tasks.find(t => t.id === activeId);
-    if (!activeTask) return;
-
-    let targetStatus: Status = activeTask.status;
-
-    if (COLUMNS.includes(overId as Status)) {
-      targetStatus = overId as Status;
-    } else {
-      const overTask = data.tasks.find(t => t.id === overId);
-      if (overTask) {
-        targetStatus = overTask.status;
-      }
-    }
-
-    if (activeTask.status !== targetStatus) {
-      await handleMoveTask(activeTask, targetStatus);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex h-screen bg-background text-foreground font-sans selection:bg-primary/20">
-      {/* Sidebar */}
-      <motion.aside
-        initial={false}
-        animate={{ width: isSidebarOpen ? 240 : 64 }}
-        className="flex flex-col border-r bg-white z-20"
-      >
-          <div className="flex h-20 items-center justify-between border-b px-6">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white shrink-0">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              {isSidebarOpen && <span className="font-extrabold text-lg tracking-tight text-primary">Bordro Planner</span>}
-            </div>
-          </div>
-
-          <nav className="flex-1 space-y-1 p-3 overflow-hidden">
-            <SidebarItem 
-              icon={LayoutDashboard} 
-              label="Pano Görünümü" 
-              isActive={!showArchived && activeTab === "board"} 
-              onClick={() => { setActiveTab("board"); setShowArchived(false); }}
-              isCollapsed={!isSidebarOpen}
-            />
-            <SidebarItem 
-              icon={Archive} 
-              label="Arşivlenmiş İşler" 
-              isActive={showArchived} 
-              onClick={() => setShowArchived(true)}
-              isCollapsed={!isSidebarOpen}
-            />
-          <SidebarItem 
-            icon={BarChart3} 
-            label="Raporlar & Analiz" 
-            isActive={activeTab === "charts"} 
-            onClick={() => setActiveTab("charts")}
-            isCollapsed={!isSidebarOpen}
-          />
-          <SidebarItem 
-            icon={UserIcon} 
-            label="Ekipler" 
-            isActive={activeTab === "teams"} 
-            onClick={() => setActiveTab("teams")}
-            isCollapsed={!isSidebarOpen}
-          />
-        </nav>
-
-        <div className="border-t p-4 mt-auto">
-          <SidebarItem 
-            icon={Sparkles} 
-            label="Yapay Zeka Asistanı" 
-            isActive={false} 
-            onClick={() => {}}
-            isCollapsed={!isSidebarOpen}
-            className="text-indigo-600 font-italic"
-          />
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="flex w-full items-center justify-center rounded-md p-2 mt-4 hover:bg-muted transition-colors"
-          >
-            {isSidebarOpen ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-          </button>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bordro Planner - Standalone Edition</title>
+    <!-- Tailwind CSS Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .card-shadow { box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1); }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        foreground: '#1E293B',
+                        background: '#FFFFFF',
+                        muted: '#F8FAFC',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-[#F4F7FB] text-slate-800">
+    <div id="root">
+        <div class="flex h-screen w-full items-center justify-center bg-white">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         </div>
-      </motion.aside>
+    </div>
 
-      {/* Main Content */}
-      <main className="flex flex-1 flex-col overflow-hidden">
-        {/* Header */}
-        <header className="flex h-20 items-center justify-between border-b bg-white px-8 z-10 shrink-0">
-          <div className="flex items-center gap-6">
-            <h1 className="text-xl font-bold tracking-tight text-slate-800">Bordro Takip Panosu</h1>
-            <Separator orientation="vertical" className="h-8" />
-            
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2 rounded-full border-slate-200">
-                    <Filter className="h-4 w-4" />
-                    {filterUserIds.length > 0 ? `${filterUserIds.length} Kişi Seçili` : "Kişiye Göre Filtrele"}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-64 p-2 shadow-2xl">
-                  <div className="px-2 py-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Tanımlı Kişiler</div>
-                  <DropdownMenuSeparator />
-                  <ScrollArea className="h-64">
-                    {data.users.map(user => (
-                      <DropdownMenuItem 
-                        key={user.id} 
-                        className="flex items-center justify-between cursor-pointer py-2 rounded-lg mb-1"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          toggleUserFilter(user.id);
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-7 w-7">
-                            <AvatarImage src={user.avatar} />
-                            <AvatarFallback>{user.name[0]}</AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm font-medium">{user.name}</span>
+    <!-- React and Libraries via ESM.sh -->
+    <script type="module">
+        import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@19';
+        import ReactDOM from 'https://esm.sh/react-dom@19/client';
+        import * as Lucide from 'https://esm.sh/lucide-react@0.344.0';
+        import { motion, AnimatePresence } from 'https://esm.sh/framer-motion@11';
+        import { 
+            DndContext, 
+            closestCorners, 
+            KeyboardSensor, 
+            PointerSensor, 
+            useSensor, 
+            useSensors,
+            DragOverlay,
+            defaultDropAnimationSideEffects,
+            useDroppable
+        } from 'https://esm.sh/@dnd-kit/core@6';
+        import { 
+            arrayMove, 
+            SortableContext, 
+            sortableKeyboardCoordinates, 
+            verticalListSortingStrategy,
+            useSortable
+        } from 'https://esm.sh/@dnd-kit/sortable@8';
+        import { CSS } from 'https://esm.sh/@dnd-kit/utilities@3';
+
+        // --- Configuration ---
+        const GEMINI_API_KEY = ""; // Buraya API anahtarınızı ekleyebilirsiniz
+        const STORAGE_KEY = "bordro_planner_data";
+        const COLUMNS = ["Backlog", "Todo", "In Progress", "Done"];
+
+        // --- Data Layer (LocalStorage) ---
+        const initialData = {
+            tasks: [],
+            users: [
+                { id: "1", name: "Burcu Gülbaz Ünlü", email: "burcu@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Burcu" },
+                { id: "2", name: "Ebru Bulut", email: "ebru@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ebru" },
+                { id: "3", name: "Eren Şenyurt", email: "eren@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Eren" },
+                { id: "4", name: "Oğuz Güleç", email: "oguz@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Oguz" },
+                { id: "5", name: "Pınar Zengin", email: "pinar@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Pinar" },
+                { id: "6", name: "Yasin Alper", email: "yasin@example.com", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Yasin" },
+            ]
+        };
+
+        const getLocalData = () => {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            return stored ? JSON.parse(stored) : initialData;
+        };
+
+        const saveLocalData = (data) => {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        };
+
+        // --- Components ---
+
+        const TaskCard = ({ task, users, onMove, onDelete, onUnarchive }) => {
+            const assignedUsers = users.filter(u => task.assignedTo?.includes(u.id));
+            const isDone = task.status === 'Done';
+            const isArchived = task.isArchived;
+
+            return (
+                <motion.div layout className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:border-indigo-300 transition-all cursor-grab active:cursor-grabbing mb-2">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onMove(task, isDone ? 'Todo' : 'Done'); }}
+                                className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${isDone ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 hover:border-indigo-400'}`}
+                            >
+                                {isDone && <Lucide.Check className="h-2.5 w-2.5 text-white" />}
+                            </button>
+                            <h4 className={`text-[12px] font-bold truncate ${isDone ? 'text-slate-400 line-through' : 'text-slate-800'}`}>
+                                {task.title}
+                            </h4>
                         </div>
-                        {filterUserIds.includes(user.id) && (
-                          <div className="bg-primary text-white p-0.5 rounded-full">
-                            <Check className="h-3 w-3" />
-                          </div>
-                        )}
-                      </DropdownMenuItem>
-                    ))}
-                  </ScrollArea>
-                  {filterUserIds.length > 0 && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        className="text-center justify-center text-primary font-bold text-xs"
-                        onClick={() => setFilterUserIds([])}
-                      >
-                        Seçimleri Temizle
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <div className="relative w-64 ml-2">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input 
-                  placeholder="İşlerde ara..." 
-                  className="pl-10 bg-slate-50 border-none rounded-full h-10 text-sm shadow-inner"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-4 ml-4">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleGenerateReport} 
-              className="gap-2 rounded-lg bg-indigo-50 border-indigo-100 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 transition-all"
-            >
-              <Sparkles className="h-4 w-4" />
-              AI Analiz
-            </Button>
-            <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-2 rounded-lg px-6 font-bold shadow-lg shadow-primary/20">
-              <Plus className="h-4 w-4" />
-              Yeni İş Ata
-            </Button>
-            <div className="flex items-center gap-3 pl-4 border-l ml-2">
-              <span className="text-xs font-bold text-slate-500 hidden xl:inline-block">Hoş Geldiniz, Eren</span>
-              <Avatar className="h-9 w-9 border-2 border-indigo-100 ring-2 ring-indigo-50">
-                <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=Eren" />
-                <AvatarFallback>E</AvatarFallback>
-              </Avatar>
-            </div>
-          </div>
-        </header>
-
-        {/* Board View */}
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="flex-1 overflow-x-auto p-6 bg-[#F4F7FB]">
-            <div className="flex h-full min-w-full gap-4">
-              {COLUMNS.map((column) => (
-                <DroppableColumn 
-                  key={column} 
-                  id={column} 
-                  title={column}
-                  tasksCount={getTasksByStatus(column).length}
-                  isActive={activeId !== null}
-                  onQuickAdd={() => setQuickAddStatus(column)}
-                  showQuickAdd={!showArchived}
-                >
-                  <SortableContext
-                    id={column}
-                    items={getTasksByStatus(column).map(t => t.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="flex flex-col gap-3 min-h-[200px]">
-                      <AnimatePresence mode="popLayout">
-                        {quickAddStatus === column && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -10, scale: 0.98 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.98 }}
-                          >
-                            <QuickAddForm 
-                              status={column} 
-                              users={data.users}
-                              onCancel={() => setQuickAddStatus(null)}
-                              onSubmit={handleAddTask}
-                            />
-                          </motion.div>
-                        )}
-
-                        {getTasksByStatus(column).map((task) => (
-                          <SortableTaskCard 
-                            key={task.id} 
-                            task={task} 
-                            users={data.users}
-                            onMove={handleMoveTask}
-                            onDelete={handleDeleteTask}
-                            onUnarchive={handleUnarchive}
-                          />
-                        ))}
-                      </AnimatePresence>
+                        <button onClick={() => onDelete(task.id)} className="text-slate-300 hover:text-red-500">
+                           <Lucide.Trash2 className="h-3 w-3" />
+                        </button>
                     </div>
-                  </SortableContext>
-                </DroppableColumn>
-              ))}
-            </div>
-          </div>
-          
-          <DragOverlay dropAnimation={{
-              sideEffects: defaultDropAnimationSideEffects({
-                styles: {
-                  active: {
-                    opacity: '0.5',
-                  },
-                },
-              }),
-            }}>
-            {activeId ? (
-              <div className="w-[300px] pointer-events-none opacity-90 shadow-2xl">
-                <TaskCard 
-                  task={data.tasks.find(t => t.id === activeId)!} 
-                  users={data.users} 
-                  onMove={() => {}} 
-                  onDelete={() => {}} 
-                />
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      </main>
+                    {task.description && <p className="text-[10px] text-slate-500 line-clamp-1 mb-3">{task.description}</p>}
+                    <div className="flex items-center justify-between border-t border-slate-50 pt-2 mt-1">
+                        <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400">
+                            <Lucide.Calendar className="h-2.5 w-2.5 text-indigo-400" />
+                            <span>{task.dueDate?.split('T')[0] || '---'}</span>
+                        </div>
+                        <div className="flex -space-x-1.5 grayscale-[0.5]">
+                            {assignedUsers.map(u => (
+                                <img key={u.id} src={u.avatar} className="h-4 w-4 rounded-full border border-white" title={u.name} />
+                            ))}
+                        </div>
+                    </div>
+                </motion.div>
+            );
+        };
 
-      {/* Main Add Task Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Yeni İş Kalemi Ata</DialogTitle>
-            <DialogDescription>Planınızı yönetmek için yeni bir görev detaylandırın.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-6 py-4">
-            <div className="grid gap-2">
-              <label className="text-xs font-bold text-slate-500 uppercase">İş Başlığı</label>
-              <Input 
-                value={newTask.title} 
-                onChange={(e) => setNewTask({...newTask, title: e.target.value})} 
-                placeholder="Görev adı..."
-                className="rounded-xl h-11 border-slate-200"
-              />
-            </div>
-            <div className="grid gap-2">
-              <label className="text-xs font-bold text-slate-500 uppercase">Açıklama</label>
-              <Textarea 
-                value={newTask.description} 
-                onChange={(e) => setNewTask({...newTask, description: e.target.value})} 
-                placeholder="Detaylar..."
-                className="rounded-xl min-h-[100px] border-slate-200"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="grid gap-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">Termin Tarihi</label>
-                <Input 
-                  type="date"
-                  value={newTask.dueDate ? newTask.dueDate.split('T')[0] : ""}
-                  onChange={(e) => setNewTask({...newTask, dueDate: new Date(e.target.value).toISOString()})}
-                  className="rounded-xl h-11 border-slate-200"
-                />
-              </div>
-              <div className="grid gap-2">
-                <label className="text-xs font-bold text-slate-500 uppercase">Öncelik</label>
-                <Select value={newTask.priority} onValueChange={(val) => setNewTask({...newTask, priority: val as Priority})}>
-                  <SelectTrigger className="rounded-xl h-11 border-slate-200">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Low">Düşük</SelectItem>
-                    <SelectItem value="Medium">Orta</SelectItem>
-                    <SelectItem value="High">Yüksek</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid gap-2">
-              <label className="text-xs font-bold text-slate-500 uppercase">Sorumlu Kişiler</label>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {data.users.map(user => (
-                  <button
-                    key={user.id}
-                    type="button"
-                    onClick={() => {
-                      const current = newTask.assignedTo || [];
-                      const next = current.includes(user.id) ? current.filter(id => id !== user.id) : [...current, user.id];
-                      setNewTask({...newTask, assignedTo: next});
-                    }}
-                    className={cn(
-                      "flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold transition-all",
-                      (newTask.assignedTo || []).includes(user.id) 
-                        ? "bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-200" 
-                        : "bg-white hover:bg-slate-50 text-slate-600 border-slate-200"
-                    )}
-                  >
-                    <Avatar className="h-5 w-5">
-                      <AvatarImage src={user.avatar} />
-                      <AvatarFallback>{user.name[0]}</AvatarFallback>
-                    </Avatar>
-                    {user.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" className="rounded-xl px-6" onClick={() => setIsAddDialogOpen(false)}>İptal</Button>
-            <Button className="rounded-xl px-8 font-bold" onClick={() => handleAddTask()}>İşi Kaydet</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        const SortableTaskCard = (props) => {
+            const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.task.id });
+            const style = { transform: CSS.Translate.toString(transform), transition, opacity: isDragging ? 0.3 : 1 };
+            return <div ref={setNodeRef} style={style} {...attributes} {...listeners}><TaskCard {...props} /></div>;
+        };
 
-      {/* AI Report Dialog */}
-      <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] h-[80vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-6 pb-0">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <DialogTitle>AI Planner Analizi</DialogTitle>
-                <DialogDescription>Gemini tarafından hazırlanan güncel durum raporu.</DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden p-6">
-            <ScrollArea className="h-full pr-4 border rounded-lg bg-[#FAFAFA]">
-              <div className="p-4 text-sm leading-relaxed whitespace-pre-wrap">
-                {generatingReport ? (
-                  <div className="flex flex-col items-center justify-center h-full py-20 gap-4 text-muted-foreground">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                    <p>Yapay zeka verileri analiz ediyor...</p>
-                  </div>
-                ) : (
-                  report
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-          <DialogFooter className="p-6 pt-0">
-            <Button onClick={() => setIsReportDialogOpen(false)}>Kapat</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-const DroppableColumn: React.FC<{ 
-  id: Status; 
-  title: string; 
-  tasksCount: number; 
-  children: React.ReactNode; 
-  isActive: boolean;
-  onQuickAdd: () => void;
-  showQuickAdd: boolean;
-}> = (props) => {
-  const { id, title, tasksCount, children, isActive, onQuickAdd, showQuickAdd } = props;
-  const { setNodeRef, isOver } = useDroppable({ id });
-
-  return (
-    <div 
-      ref={setNodeRef} 
-      className={cn(
-        "flex-1 min-w-[250px] max-w-[340px] flex flex-col gap-2 rounded-xl transition-all duration-200",
-        isOver && "bg-indigo-50/50 ring-2 ring-indigo-200 ring-inset"
-      )}
-    >
-      <div className={cn(
-        "flex items-center justify-between px-2 py-1 rounded-lg",
-        isActive && !isOver && "bg-slate-100/50"
-      )}>
-        <div className="flex items-center gap-2">
-          <div className={cn(
-            "w-2.5 h-2.5 rounded-full shadow-sm",
-            title === 'Backlog' && "bg-slate-400",
-            title === 'Todo' && "bg-amber-400",
-            title === 'In Progress' && "bg-blue-500",
-            title === 'Done' && "bg-emerald-500",
-          )} />
-          <h3 className="font-bold text-xs text-slate-600 uppercase tracking-wider flex items-center gap-2">
-            {title} 
-            <span className="bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded text-[9px] font-bold">
-              {tasksCount}
-            </span>
-          </h3>
-        </div>
-        {showQuickAdd && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-7 text-slate-400 hover:text-indigo-600 font-bold gap-1 text-[10px]"
-            onClick={onQuickAdd}
-          >
-            <Plus className="h-3 w-3" />
-            Ekle
-          </Button>
-        )}
-      </div>
-      <div className="flex-1 overflow-y-auto pr-1 pb-10 scrollbar-hide">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function QuickAddForm({ status, users, onCancel, onSubmit }: { 
-  status: Status; 
-  users: User[]; 
-  onCancel: () => void;
-  onSubmit: (task: Partial<Task>) => void;
-}) {
-  const [title, setTitle] = React.useState("");
-  const [dueDate, setDueDate] = React.useState(new Date().toISOString().split('T')[0]);
-  const [assignedTo, setAssignedTo] = React.useState<string[]>([]);
-
-  return (
-    <Card className="border border-indigo-100 overflow-hidden shadow-lg rounded-xl mb-2 group ring-2 ring-indigo-50/50">
-      <CardContent className="p-3 space-y-3 bg-white">
-        <div className="flex items-center gap-2">
-          <Input 
-            autoFocus 
-            placeholder="Görev adı..." 
-            className="border-none bg-slate-50 focus-visible:ring-0 text-xs font-bold h-8 rounded-lg"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </div>
-        
-        <div className="flex items-center justify-between gap-2 px-1">
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="h-3 w-3 text-indigo-500" />
-            <Input 
-              type="date" 
-              className="border-none p-0 h-6 bg-transparent focus-visible:ring-0 text-[10px] font-bold text-slate-600 w-24" 
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-             <DropdownMenu>
-               <DropdownMenuTrigger asChild>
-                 <button className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 hover:text-indigo-600 transition-colors bg-slate-50 px-2 py-1 rounded-md">
-                   <UserIcon className="h-3 w-3" />
-                   {assignedTo.length > 0 ? `${assignedTo.length} Kişi` : "Seç"}
-                 </button>
-               </DropdownMenuTrigger>
-               <DropdownMenuContent className="w-56 p-1 rounded-lg">
-                  <ScrollArea className="h-48">
-                    {users.map(u => (
-                      <DropdownMenuItem 
-                        key={u.id}
-                        className="flex items-center justify-between py-1.5 rounded-md cursor-pointer"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setAssignedTo(prev => prev.includes(u.id) ? prev.filter(id => id !== u.id) : [...prev, u.id]);
-                        }}
-                      >
+        const DroppableColumn = ({ id, title, tasksCount, children, isActive }) => {
+            const { setNodeRef, isOver } = useDroppable({ id });
+            return (
+                <div ref={setNodeRef} className={`flex-1 min-w-[250px] max-w-[320px] flex flex-col gap-3 rounded-2xl p-2 transition-all ${isOver ? 'bg-indigo-50 ring-2 ring-indigo-100' : ''}`}>
+                    <div className="flex items-center justify-between px-2">
                         <div className="flex items-center gap-2">
-                           <Avatar className="h-5 w-5"><AvatarImage src={u.avatar} /></Avatar>
-                           <span className="text-[11px] font-medium">{u.name}</span>
+                            <div className={`w-2 h-2 rounded-full ${title === 'Backlog' ? 'bg-slate-400' : title === 'Todo' ? 'bg-amber-400' : title === 'In Progress' ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
+                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500">{title}</span>
+                            <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-bold">{tasksCount}</span>
                         </div>
-                        {assignedTo.includes(u.id) && <Check className="h-3 w-3 text-primary" />}
-                      </DropdownMenuItem>
-                    ))}
-                  </ScrollArea>
-               </DropdownMenuContent>
-             </DropdownMenu>
-          </div>
-        </div>
-      </CardContent>
-      <div className="flex h-10 overflow-hidden border-t">
-        <button 
-          onClick={onCancel} 
-          className="flex-1 text-[10px] font-bold bg-slate-50 hover:bg-slate-100 transition-colors text-slate-500"
-        >
-          İptal
-        </button>
-        <button 
-          onClick={() => title && onSubmit({ title, status, dueDate, assignedTo, priority: "Medium" })}
-          className="flex-1 text-[10px] font-bold bg-indigo-600 hover:bg-indigo-700 transition-colors text-white"
-        >
-          Ekle
-        </button>
-      </div>
-    </Card>
-  );
-}
-
-function SortableTaskCard(props: any) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id: props.task.id });
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    opacity: isDragging ? 0 : 1,
-  };
-
-  return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <TaskCard {...props} />
-    </div>
-  );
-}
-
-function TaskCard({ task, users, onMove, onDelete, onUnarchive }: { 
-  task: Task; 
-  users: User[]; 
-  onMove: (task: Task, status: Status) => Promise<void> | void;
-  onDelete: (id: string) => Promise<void> | void;
-  onUnarchive?: (id: string) => Promise<void> | void;
-}) {
-  const assignedUsers = users.filter(u => task.assignedTo?.includes(u.id));
-  const isDone = task.status === 'Done';
-  const isArchived = task.isArchived;
-  
-  return (
-    <motion.div
-      layout
-      className="group"
-    >
-      <Card className={cn(
-        "relative overflow-hidden transition-all bg-white border-slate-200 rounded-xl cursor-grab active:cursor-grabbing hover:border-indigo-200 mb-1",
-        isDone && !isArchived && "bg-slate-50/50 opacity-90",
-        isArchived && "border-indigo-100"
-      )}>
-        <CardHeader className="p-2.5 pb-1 space-y-0">
-          <div className="flex items-start justify-between gap-1.5">
-            <div className="flex items-start gap-2 flex-1 min-w-0">
-              <button 
-                className={cn(
-                  "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all shrink-0 mt-0.5",
-                  isDone ? "bg-emerald-500 border-emerald-500" : "border-slate-300 hover:border-indigo-400 hover:bg-indigo-50"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMove(task, isDone ? "Todo" : "Done");
-                }}
-              >
-                {isDone && <Check className="h-2.5 w-2.5 text-white" />}
-              </button>
-              <CardTitle className={cn(
-                "text-[0.75rem] font-bold leading-tight transition-all truncate",
-                isDone ? "text-slate-400 line-through" : "text-slate-800"
-              )}>
-                {task.title}
-              </CardTitle>
-            </div>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-5 w-5 text-slate-300 hover:text-indigo-600 opacity-0 group-hover:opacity-100 -mt-0.5 -mr-0.5">
-                  <MoreHorizontal className="h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="rounded-lg shadow-xl text-[10px]">
-                <DropdownMenuItem onClick={() => onMove(task, "Todo")} className="rounded-md py-1">Başlat (Todo)</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onMove(task, "In Progress")} className="rounded-md py-1">Devam Ediyor</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onMove(task, "Done")} className="rounded-md py-1">Tamamla & Arşivle</DropdownMenuItem>
-                {isArchived && onUnarchive && (
-                   <DropdownMenuItem onClick={() => onUnarchive(task.id)} className="rounded-md py-1 font-bold text-indigo-600">
-                     <Undo2 className="h-2.5 w-2.5 mr-2" />
-                     Geri Al (Pano'ya Çek)
-                   </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onDelete(task.id)} className="text-destructive font-bold rounded-md py-1 focus:bg-destructive/10">Sil</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
-        
-        <CardContent className="px-2.5 py-1.5 space-y-1.5">
-          {task.description && (
-            <p className="text-[9px] text-slate-500 line-clamp-1 leading-normal font-medium">
-               {task.description}
-            </p>
-          )}
-
-          <div className="flex items-center justify-between gap-1 border-t border-slate-50 pt-1 mt-0.5">
-            <div className="flex items-center gap-1 text-[8px] font-bold text-slate-500">
-              <CalendarIcon className="h-2.5 w-2.5 text-indigo-400" />
-              <span>{task.dueDate ? format(new Date(task.dueDate), "dd.MM") : "---"}</span>
-            </div>
-            
-            <div className="flex items-center gap-2">
-               <div className="flex -space-x-1 shrink-0">
-                  {assignedUsers.length > 0 ? assignedUsers.slice(0, 2).map(u => (
-                    <Avatar key={u.id} className="h-4 w-4 border border-white ring-1 ring-slate-100 shadow-sm">
-                      <AvatarImage src={u.avatar} />
-                      <AvatarFallback className="text-[7px]">{u.name[0]}</AvatarFallback>
-                    </Avatar>
-                  )) : null}
-                  {assignedUsers.length > 2 && (
-                    <div className="h-4 w-4 rounded-full bg-slate-100 flex items-center justify-center border border-white text-[7px] font-bold text-slate-500">
-                      +{assignedUsers.length - 2}
                     </div>
-                  )}
-               </div>
-               {assignedUsers.length === 0 && <UserIcon className="h-2.5 w-2.5 text-slate-200" />}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
+                    <div className="flex-1">{children}</div>
+                </div>
+            );
+        };
 
-function SidebarItem({ icon: Icon, label, isActive, onClick, isCollapsed, className }: any) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-4 w-full rounded-xl px-4 py-3 text-sm font-semibold transition-all group",
-        isActive 
-          ? "bg-indigo-50 text-primary shadow-sm" 
-          : "text-muted-foreground hover:bg-slate-50 hover:text-foreground",
-        className
-      )}
-    >
-      <Icon className={cn("h-5 w-5 shrink-0", isActive ? "text-primary" : "text-slate-400 group-hover:text-foreground")} />
-      {!isCollapsed && <span>{label}</span>}
-    </button>
-  );
-}
+        // --- Main App ---
+
+        function App() {
+            const [data, setData] = useState({ tasks: [], users: [] });
+            const [activeTab, setActiveTab] = useState('board');
+            const [showArchived, setShowArchived] = useState(false);
+            const [search, setSearch] = useState("");
+            const [activeId, setActiveId] = useState(null);
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [filterUserIds, setFilterUserIds] = useState([]);
+
+            const [newTask, setNewTask] = useState({ title: "", description: "", status: "Todo", priority: "Medium", assignedTo: [], dueDate: "" });
+
+            useEffect(() => {
+                setData(getLocalData());
+            }, []);
+
+            useEffect(() => {
+                if (data.users.length > 0) saveLocalData(data);
+            }, [data]);
+
+            const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+
+            const handleAddTask = () => {
+                if (!newTask.title) return;
+                const taskToAdd = { ...newTask, id: Math.random().toString(36).substring(2, 9), createdAt: new Date().toISOString(), isArchived: false };
+                if (taskToAdd.status === 'Done') taskToAdd.isArchived = true;
+                setData(prev => ({ ...prev, tasks: [...prev.tasks, taskToAdd] }));
+                setIsModalOpen(false);
+                setNewTask({ title: "", description: "", status: "Todo", priority: "Medium", assignedTo: [], dueDate: "" });
+            };
+
+            const handleMoveTask = (task, newStatus) => {
+                setData(prev => ({
+                    ...prev,
+                    tasks: prev.tasks.map(t => t.id === task.id ? { ...t, status: newStatus, isArchived: newStatus === 'Done' } : t)
+                }));
+            };
+
+            const handleDelete = (id) => {
+                setData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }));
+            };
+
+            const filteredTasks = data.tasks.filter(t => {
+                const matchesSearch = t.title.toLowerCase().includes(search.toLowerCase());
+                const matchesUser = filterUserIds.length === 0 || t.assignedTo?.some(uid => filterUserIds.includes(uid));
+                const matchesTab = showArchived ? t.isArchived : !t.isArchived;
+                return matchesSearch && matchesUser && matchesTab;
+            });
+
+            // DnD Handlers
+            const handleDragEnd = (event) => {
+                const { active, over } = event;
+                if (!over) return;
+                const activeTask = data.tasks.find(t => t.id === active.id);
+                if (!activeTask) return;
+                const newStatus = COLUMNS.includes(over.id) ? over.id : data.tasks.find(t => t.id === over.id)?.status;
+                if (newStatus && activeTask.status !== newStatus) {
+                    handleMoveTask(activeTask, newStatus);
+                }
+                setActiveId(null);
+            };
+
+            return (
+                <div className="flex h-screen w-full overflow-hidden bg-[#F4F7FB]">
+                    <!-- Sidebar -->
+                    <div className="w-64 bg-white border-r flex flex-col p-4 shrink-0">
+                        <div className="flex items-center gap-2 mb-10 px-2 mt-2">
+                            <div className="bg-indigo-600 p-1.5 rounded-lg text-white"><Lucide.Sparkles className="h-5 w-5" /></div>
+                            <span className="font-extrabold text-lg text-indigo-700 tracking-tighter">Bordro Planner</span>
+                        </div>
+                        <nav className="flex-1 space-y-2">
+                            <button onClick={() => {setShowArchived(false); setActiveTab('board');}} className={`flex items-center gap-3 w-full p-3 rounded-xl text-sm font-bold transition-all ${!showArchived ? 'bg-indigo-50 text-indigo-700' : 'text-slate-400 hover:bg-slate-50'}`}>
+                                <Lucide.LayoutDashboard className="h-5 w-5" /> Pano Görünümü
+                            </button>
+                            <button onClick={() => setShowArchived(true)} className={`flex items-center gap-3 w-full p-3 rounded-xl text-sm font-bold transition-all ${showArchived ? 'bg-indigo-50 text-indigo-700' : 'text-slate-400 hover:bg-slate-50'}`}>
+                                <Lucide.Archive className="h-5 w-5" /> Arşivlenmiş İşler
+                            </button>
+                        </nav>
+                        <div className="bg-indigo-600 rounded-2xl p-4 text-white text-[11px]">
+                            <p className="opacity-80 mb-2">Bordro takip sürecini hızlandırmak için yapay zeka analizini kullanın.</p>
+                            <button className="bg-white/20 hover:bg-white/30 w-full py-2 rounded-lg font-bold transition-all">Rapor Oluştur</button>
+                        </div>
+                    </div>
+
+                    <!-- Main -->
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                        <header className="h-20 border-b bg-white flex items-center justify-between px-8 shrink-0">
+                            <div className="flex items-center gap-4">
+                                <h1 className="text-xl font-extrabold text-slate-800">Bordro Takip Panosu</h1>
+                                <div className="relative">
+                                    <Lucide.Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                    <input value={search} onChange={(e)=>setSearch(e.target.value)} border-none placeholder="İşlerde ara..." className="pl-10 h-10 w-64 bg-slate-50 rounded-full border-none focus:ring-2 focus:ring-indigo-100 outline-none text-sm" />
+                                </div>
+                            </div>
+                            <button onClick={() => setIsModalOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-100 transition-all text-sm">
+                                <Lucide.Plus className="h-4 w-4" /> Yeni İş Ata
+                            </button>
+                        </header>
+
+                        <div className="flex-1 overflow-x-auto p-8">
+                            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd} onDragStart={(e)=>setActiveId(e.active.id)}>
+                                <div className="flex gap-6 h-full min-w-max">
+                                    {COLUMNS.map(col => (
+                                        <DroppableColumn key={col} id={col} title={col} tasksCount={filteredTasks.filter(t=>t.status===col).length} isActive={activeId !== null}>
+                                            <SortableContext items={filteredTasks.filter(t=>t.status===col).map(t=>t.id)} strategy={verticalListSortingStrategy}>
+                                                <div className="min-h-[200px]">
+                                                    {filteredTasks.filter(t=>t.status===col).map(task => (
+                                                        <SortableTaskCard key={task.id} task={task} users={data.users} onMove={handleMoveTask} onDelete={handleDelete} />
+                                                    ))}
+                                                </div>
+                                            </SortableContext>
+                                        </DroppableColumn>
+                                    ))}
+                                </div>
+                            </DndContext>
+                        </div>
+                    </div>
+
+                    <!-- Modal -->
+                    {isModalOpen && (
+                        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-3xl w-full max-w-md p-6 shadow-2xl scale-in">
+                                <h3 className="text-xl font-extrabold mb-4">Yeni İş Detayları</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">İş Başlığı</label>
+                                        <input value={newTask.title} onChange={(e)=>setNewTask({...newTask, title: e.target.value})} className="w-full h-11 border bg-slate-50 border-slate-100 rounded-xl px-4 outline-none focus:ring-2 focus:ring-indigo-100" placeholder="Örn: Mart Ayı Bordro Hazırlığı" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Sorumlular</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {data.users.map(u => (
+                                                <button key={u.id} onClick={()=>{
+                                                    const current = newTask.assignedTo;
+                                                    setNewTask({...newTask, assignedTo: current.includes(u.id) ? current.filter(id=>id!==u.id) : [...current, u.id]})
+                                                }} className={`flex items-center gap-2 border px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${newTask.assignedTo.includes(u.id) ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-100 hover:bg-slate-50'}`}>
+                                                    <img src={u.avatar} className="h-4 w-4" /> {u.name.split(' ')[0]}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <div className="flex-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Termin</label>
+                                            <input type="date" value={newTask.dueDate} onChange={(e)=>setNewTask({...newTask, dueDate: e.target.value})} className="w-full h-11 border bg-slate-50 border-slate-100 rounded-xl px-4 outline-none focus:ring-2 focus:ring-indigo-100" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Durum</label>
+                                            <select value={newTask.status} onChange={(e)=>setNewTask({...newTask, status: e.target.value})} className="w-full h-11 border bg-slate-50 border-slate-100 rounded-xl px-4 outline-none">
+                                                {COLUMNS.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-8 flex gap-3">
+                                    <button onClick={() => setIsModalOpen(false)} className="flex-1 h-11 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-all">İptal</button>
+                                    <button onClick={handleAddTask} className="flex-1 h-11 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">Kaydet</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</body>
+</html>
