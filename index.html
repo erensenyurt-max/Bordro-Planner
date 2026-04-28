@@ -149,21 +149,35 @@
         let activeTab = 'board';
 
         // Buluttan Veri Çekme
-        async function fetchData() {
-            if(!SHEET_API_URL || SHEET_API_URL.includes("BURAYA")) return;
+// İyileştirilmiş Kaydetme Fonksiyonu
+        async function pushData() {
+            // Kaydetme sırasında sayfayı kilitleme (Görsel geri bildirim)
             document.getElementById('loader-overlay').style.display = 'flex';
+            const dataToPush = [
+                ["ID", "Title", "Desc", "Date", "User", "Status", "Archived"], // Başlık satırı
+                ...tasks.map(t => [t.id, t.title, t.desc, t.date, t.user, t.status, t.archived])
+            ];
+            
             try {
-                const response = await fetch(SHEET_API_URL);
-                const raw = await response.json();
-                tasks = raw.slice(1).map(r => ({
-                    id: String(r[0]), title: String(r[1]), desc: String(r[2]), 
-                    date: String(r[3]), user: String(r[4]), status: String(r[5]), archived: r[6] === true || String(r[6]).toUpperCase() === "TRUE"
-                }));
-                render();
-            } catch (e) { alert("Veri Çekilemedi. Apps Script URL'sini kontrol edin."); }
+                // Veriyi gönder
+                await fetch(SHEET_API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    header: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dataToPush)
+                });
+                
+                // ÖNEMLİ: Hemen fetchData yapmıyoruz. 
+                // Local'deki veriyi ekranda tutmaya devam ediyoruz (Kaybolmayı önler).
+                render(); 
+                
+                // 3 saniye sonra sessizce arka planda güncel halini kontrol et
+                setTimeout(fetchData, 3000); 
+            } catch (e) { 
+                console.error("Hata", e);
+            }
             document.getElementById('loader-overlay').style.display = 'none';
         }
-
         // Buluta Veri Gönder
         async function pushData() {
             document.getElementById('loader-overlay').style.display = 'flex';
