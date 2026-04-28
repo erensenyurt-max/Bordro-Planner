@@ -3,18 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bordro Planner Pro - AI Studio Edition</title>
+    <title>Bordro Planner Pro - Kurumsal Sync</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; overflow: hidden; }
         .kanban-col { min-width: 300px; max-width: 300px; }
-        .active-nav { background-color: #EEF2FF; color: #4F46E5; font-weight: 700; }
-        .card-shadow { box-shadow: 0 2px 4px rgba(0,0,0,0.02), 0 1px 0 rgba(0,0,0,0.02); }
+        .loading-overlay { background: rgba(255,255,255,0.8); backdrop-filter: blur(4px); z-index: 100; display: none; }
     </style>
 </head>
 <body>
+    <div id="loader" class="fixed inset-0 loading-overlay flex flex-col items-center justify-center">
+        <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p class="font-bold text-indigo-600">Bulut Verileri Senkronize Ediliyor...</p>
+    </div>
+
     <div id="app" class="flex h-screen">
         <aside class="w-64 bg-white border-r flex flex-col z-20">
             <div class="h-20 flex items-center px-6 border-b">
@@ -22,66 +26,40 @@
                 <span class="font-extrabold text-lg text-indigo-600 tracking-tight">Bordro Planner</span>
             </div>
             <nav class="flex-1 p-4 space-y-1">
-                <div onclick="switchTab('board')" id="nav-board" class="flex items-center gap-3 p-3 rounded-xl cursor-pointer active-nav transition-all">
-                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i><span class="text-sm">Pano Görünümü</span>
+                <div onclick="switchTab('board')" class="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-indigo-50 transition-all text-slate-600" id="btn-board">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i><span>Pano Görünümü</span>
                 </div>
-                <div onclick="switchTab('archive')" id="nav-archive" class="flex items-center gap-3 p-3 text-slate-500 hover:bg-slate-50 rounded-xl cursor-pointer transition-all">
-                    <i data-lucide="archive" class="w-5 h-5"></i><span class="text-sm">Arşivlenmiş İşler</span>
-                </div>
-                <div class="flex items-center gap-3 p-3 text-slate-500 hover:bg-slate-50 rounded-xl cursor-pointer">
-                    <i data-lucide="bar-chart-3" class="w-5 h-5"></i><span class="text-sm">Raporlar & Analiz</span>
-                </div>
-                <div class="flex items-center gap-3 p-3 text-slate-500 hover:bg-slate-50 rounded-xl cursor-pointer">
-                    <i data-lucide="users" class="w-5 h-5"></i><span class="text-sm">Ekipler</span>
+                <div onclick="switchTab('archive')" class="flex items-center gap-3 p-3 rounded-xl cursor-pointer hover:bg-indigo-50 transition-all text-slate-600" id="btn-archive">
+                    <i data-lucide="archive" class="w-5 h-5"></i><span>Arşivlenmiş İşler</span>
                 </div>
             </nav>
+            <div class="p-4 border-t">
+                <button onclick="fetchData()" class="w-full py-2 text-xs font-bold text-slate-400 hover:text-indigo-600 flex items-center justify-center gap-2">
+                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> VERİLERİ ZORLA YENİLE
+                </button>
+            </div>
         </aside>
 
         <main class="flex-1 flex flex-col overflow-hidden">
-            <header class="h-20 bg-white border-b flex items-center justify-between px-8 shrink-0">
+            <header class="h-20 bg-white border-b flex items-center justify-between px-8">
                 <div class="flex items-center gap-4">
-                    <h1 id="page-title" class="text-xl font-bold text-slate-800">Bordro Takip Panosu</h1>
-                    <div class="h-6 w-[1px] bg-slate-200 mx-2"></div>
-                    
-                    <div class="relative">
-                        <select id="user-filter" onchange="render()" class="appearance-none bg-white border border-slate-200 rounded-full px-5 py-2 text-sm font-semibold text-slate-600 outline-none hover:bg-slate-50 cursor-pointer pr-10">
-                            <option value="all">Kişiye Göre Filtrele</option>
-                            <option value="Eren">Eren Şenyurt</option>
-                            <option value="Pinar">Pınar Zengin</option>
-                            <option value="Burcu">Burcu Gülbaz Ünlü</option>
-                            <option value="Ebru">Ebru Bulut</option>
-                            <option value="Oguz">Oğuz Güleç</option>
-                            <option value="Yasin">Yasin Alper</option>
-                        </select>
-                        <i data-lucide="chevron-down" class="absolute right-3 top-2.5 w-4 h-4 text-slate-400 pointer-events-none"></i>
-                    </div>
-
-                    <div class="relative">
-                        <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-slate-400"></i>
-                        <input type="text" id="task-search" oninput="render()" placeholder="İşlerde ara..." class="bg-slate-50 border-none rounded-full px-10 py-2 text-sm w-64 focus:ring-2 ring-indigo-100 outline-none">
-                    </div>
+                    <h1 class="text-xl font-bold text-slate-800">İş Takip Panosu</h1>
+                    <select id="user-filter" onchange="render()" class="border border-slate-200 px-4 py-2 rounded-full text-sm font-semibold outline-none focus:ring-2 ring-indigo-500">
+                        <option value="all">Tüm Personeller</option>
+                        <option value="Eren">Eren Şenyurt</option>
+                        <option value="Pinar">Pınar Zengin</option>
+                        <option value="Burcu">Burcu Gülbaz Ünlü</option>
+                        <option value="Ebru">Ebru Bulut</option>
+                        <option value="Oguz">Oğuz Güleç</option>
+                        <option value="Yasin">Yasin Alper</option>
+                    </select>
                 </div>
-
-                <div class="flex items-center gap-3">
-                    <button class="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg flex items-center gap-2 border border-indigo-100 font-bold text-sm hover:bg-indigo-100 transition-all">
-                        <i data-lucide="sparkles" class="w-4 h-4"></i> AI Analiz
-                    </button>
-                    <button onclick="openModal('Todo')" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-indigo-100 flex items-center gap-2 hover:bg-indigo-700 transition-all text-sm">
-                        <i data-lucide="plus" class="w-4 h-4"></i> Yeni İş Ata
-                    </button>
-                    <div class="flex items-center gap-3 pl-4 border-l ml-2">
-                        <div class="text-right">
-                            <p class="text-[9px] font-bold text-slate-400 uppercase leading-none">Hoş Geldiniz</p>
-                            <p class="text-xs font-bold text-slate-700">Eren Şenyurt</p>
-                        </div>
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Eren" class="w-9 h-9 rounded-full border-2 border-indigo-50 shadow-sm" />
-                    </div>
-                </div>
+                <button onclick="openModal('Todo')" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition-all flex items-center gap-2">
+                    <i data-lucide="plus" class="w-4 h-4"></i> Yeni İş Ata
+                </button>
             </header>
 
-            <div id="board-view" class="flex-1 overflow-x-auto p-6 flex gap-6 bg-[#F4F7FB] scrollbar-hide">
-                </div>
-
+            <div id="board-view" class="flex-1 overflow-x-auto p-6 flex gap-6 bg-[#F4F7FB]"></div>
             <div id="archive-view" class="hidden flex-1 p-8 overflow-y-auto bg-slate-50">
                 <div id="archive-list" class="max-w-4xl mx-auto space-y-4"></div>
             </div>
@@ -89,213 +67,120 @@
     </div>
 
     <div id="modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50">
-        <div class="bg-white w-[500px] p-8 rounded-3xl shadow-2xl border border-slate-100">
-            <h2 id="modal-title" class="text-xl font-bold mb-6 text-slate-800">Yeni İş Kalemi Ata</h2>
-            <input type="hidden" id="edit-task-id">
-            <div class="space-y-5">
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">İş Başlığı</label>
-                    <input id="task-title" type="text" placeholder="Görev adı..." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 ring-indigo-500">
-                </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Açıklama</label>
-                    <textarea id="task-desc" placeholder="Detaylar..." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl h-24 outline-none focus:ring-2 ring-indigo-500"></textarea>
-                </div>
+        <div class="bg-white w-[450px] p-8 rounded-3xl shadow-2xl">
+            <h2 class="text-xl font-bold mb-6">Görev Detayı</h2>
+            <div class="space-y-4">
+                <input id="task-title" type="text" placeholder="İş Başlığı" class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                <textarea id="task-desc" placeholder="Açıklama" class="w-full p-3 bg-slate-50 border rounded-xl h-24 outline-none"></textarea>
                 <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Termin Tarihi</label>
-                        <input id="task-date" type="date" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none">
-                    </div>
-                    <div>
-                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Sorumlu Kişi</label>
-                        <select id="task-user" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none">
-                            <option value="Eren">Eren Şenyurt</option>
-                            <option value="Pinar">Pınar Zengin</option>
-                            <option value="Burcu">Burcu Gülbaz Ünlü</option>
-                            <option value="Ebru">Ebru Bulut</option>
-                            <option value="Oguz">Oğuz Güleç</option>
-                            <option value="Yasin">Yasin Alper</option>
-                        </select>
-                    </div>
+                    <input id="task-date" type="date" class="w-full p-3 bg-slate-50 border rounded-xl">
+                    <select id="task-user" class="w-full p-3 bg-slate-50 border rounded-xl">
+                        <option value="Eren">Eren Şenyurt</option>
+                        <option value="Pinar">Pınar Zengin</option>
+                        <option value="Burcu">Burcu Gülbaz Ünlü</option>
+                        <option value="Ebru">Ebru Bulut</option>
+                        <option value="Oguz">Oğuz Güleç</option>
+                        <option value="Yasin">Yasin Alper</option>
+                    </select>
                 </div>
             </div>
             <div class="flex justify-end gap-3 mt-8">
-                <button onclick="closeModal()" class="px-6 py-2 text-slate-400 font-bold hover:text-slate-600 transition-all">Vazgeç</button>
-                <button onclick="saveTask()" class="bg-indigo-600 text-white px-10 py-3 rounded-xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">Görevi Kaydet</button>
+                <button onclick="closeModal()" class="px-6 py-2 text-slate-400 font-bold">Vazgeç</button>
+                <button onclick="saveTask()" class="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold">Kaydet</button>
             </div>
         </div>
     </div>
 
     <script>
-        const USERS = {
-            'Eren': 'https://api.dicebear.com/7.x/avataaars/svg?seed=Eren',
-            'Pinar': 'https://api.dicebear.com/7.x/avataaars/svg?seed=Pinar',
-            'Burcu': 'https://api.dicebear.com/7.x/avataaars/svg?seed=Burcu',
-            'Ebru': 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ebru',
-            'Oguz': 'https://api.dicebear.com/7.x/avataaars/svg?seed=Oguz',
-            'Yasin': 'https://api.dicebear.com/7.x/avataaars/svg?seed=Yasin'
-        };
+        // BURAYI KENDİ URL'NİZ İLE DEĞİŞTİRİN
+        const SHEET_API_URL = "https://script.google.com/a/macros/defacto.com/s/AKfycbyp20QYPDSbT-8lzu0eclEfctngiRj8vpwCon4y6yxVaxyKTMYIO5cQFbXGXE49fcmX/exec"; 
 
-        const COLS = { 
-            'Backlog': 'bg-slate-400', 
-            'Todo': 'bg-amber-400', 
-            'InProgress': 'bg-blue-500', 
-            'Done': 'bg-emerald-500' 
-        };
-
-        let tasks = JSON.parse(localStorage.getItem('bordroTasks')) || [];
+        let tasks = [];
         let activeTab = 'board';
-        let currentStatus = 'Todo';
+
+        async function fetchData() {
+            if(!SHEET_API_URL.startsWith("http")) return;
+            document.getElementById('loader').style.display = 'flex';
+            try {
+                const res = await fetch(SHEET_API_URL);
+                const data = await res.json();
+                tasks = data.slice(1).map(r => ({
+                    id: r[0], title: r[1], desc: r[2], date: r[3], user: r[4], status: r[5], archived: r[6] == "TRUE"
+                }));
+                render();
+            } catch (e) { console.error("Hata:", e); }
+            document.getElementById('loader').style.display = 'none';
+        }
+
+        async function pushData() {
+            document.getElementById('loader').style.display = 'flex';
+            await fetch(SHEET_API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(tasks) });
+            setTimeout(fetchData, 1500);
+        }
 
         function render() {
             const board = document.getElementById('board-view');
             const archive = document.getElementById('archive-list');
-            const filterUser = document.getElementById('user-filter').value;
-            const searchKey = document.getElementById('task-search').value.toLowerCase();
-            
+            const filter = document.getElementById('user-filter').value;
             board.innerHTML = ''; archive.innerHTML = '';
 
-            let filtered = tasks.filter(t => {
-                const matchesUser = filterUser === 'all' || t.user === filterUser;
-                const matchesSearch = t.title.toLowerCase().includes(searchKey) || (t.desc && t.desc.toLowerCase().includes(searchKey));
-                return matchesUser && matchesSearch;
-            });
+            const filtered = filter === 'all' ? tasks : tasks.filter(t => t.user === filter);
 
-            if (activeTab === 'board') {
-                Object.keys(COLS).forEach(colId => {
-                    const colTasks = filtered.filter(t => t.status === colId && !t.archived);
-                    const colDiv = document.createElement('div');
-                    colDiv.className = 'kanban-col flex flex-col gap-4';
-                    colDiv.innerHTML = `
-                        <div class="flex items-center justify-between px-1">
-                            <div class="flex items-center gap-2 font-bold text-[11px] text-slate-400 tracking-widest uppercase">
-                                <div class="w-2 h-2 rounded-full ${COLS[colId]}"></div> ${colId} <span class="bg-slate-200 px-1.5 py-0.5 rounded text-[9px] text-slate-500">${colTasks.length}</span>
-                            </div>
-                            <div class="flex gap-2">
-                                <button onclick="openModal('${colId}')" class="text-slate-300 hover:text-indigo-600"><i data-lucide="plus" class="w-4 h-4"></i></button>
-                            </div>
-                        </div>
-                        <div id="${colId}" class="task-list flex-1 space-y-3 min-h-[200px]" ondragover="allowDrop(event)" ondrop="drop(event, '${colId}')"></div>
-                    `;
-                    board.appendChild(colDiv);
-                    const list = colDiv.querySelector('.task-list');
-                    colTasks.forEach(task => list.appendChild(createCard(task)));
+            if(activeTab === 'board') {
+                ['Backlog', 'Todo', 'InProgress', 'Done'].forEach(status => {
+                    const colTasks = filtered.filter(t => t.status === status && !t.archived);
+                    const col = document.createElement('div');
+                    col.className = 'kanban-col flex flex-col gap-4';
+                    col.innerHTML = `<h3 class="font-bold text-slate-400 text-xs uppercase px-2">${status} (${colTasks.length})</h3>
+                                    <div class="flex-1 space-y-3 min-h-[200px]" ondragover="event.preventDefault()" ondrop="drop(event, '${status}')"></div>`;
+                    board.appendChild(col);
+                    colTasks.forEach(t => col.querySelector('div').appendChild(createCard(t)));
                 });
             } else {
-                const archived = filtered.filter(t => t.archived);
-                if (archived.length === 0) archive.innerHTML = '<div class="text-center py-20 text-slate-400 font-medium">Arşivlenmiş kayıt bulunamadı.</div>';
-                archived.forEach(task => {
-                    const div = document.createElement('div');
-                    div.className = "bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-indigo-200 transition-all";
-                    div.innerHTML = `
-                        <div class="flex items-center gap-4">
-                            <img src="${USERS[task.user]}" class="w-10 h-10 rounded-full border border-slate-100 shadow-sm">
-                            <div>
-                                <h4 class="font-bold text-slate-800">${task.title}</h4>
-                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">📅 ${task.date || '---'} • ${task.user}</p>
-                            </div>
-                        </div>
-                        <div class="flex gap-3">
-                            <button onclick="openEditModal('${task.id}')" class="text-slate-400 hover:text-indigo-600"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-                            <button onclick="restoreTask('${task.id}')" class="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all">Geri Al</button>
-                        </div>
-                    `;
-                    archive.appendChild(div);
+                filtered.filter(t => t.archived).forEach(t => {
+                    const item = document.createElement('div');
+                    item.className = "bg-white p-4 rounded-2xl border flex justify-between items-center shadow-sm";
+                    item.innerHTML = `<div><h4 class="font-bold">${t.title}</h4><p class="text-xs text-slate-400">${t.user} - ${t.date}</p></div>
+                                      <button onclick="restore('${t.id}')" class="text-indigo-600 font-bold text-xs">Geri Al</button>`;
+                    archive.appendChild(item);
                 });
             }
-            localStorage.setItem('bordroTasks', JSON.stringify(tasks));
             lucide.createIcons();
         }
 
-        function createCard(task) {
+        function createCard(t) {
             const card = document.createElement('div');
-            card.className = "bg-white p-4 rounded-2xl border border-slate-100 card-shadow cursor-grab active:cursor-grabbing hover:border-indigo-300 transition-all group relative";
-            card.draggable = true; card.id = task.id;
-            card.ondragstart = (e) => { e.dataTransfer.setData('text', task.id); card.classList.add('opacity-40'); };
-            card.ondragend = () => card.classList.remove('opacity-40');
-            card.onclick = (e) => { if(e.target.closest('button')) return; openEditModal(task.id); };
-            
-            card.innerHTML = `
-                <div class="flex justify-between items-start mb-2">
-                    <h4 class="text-[13px] font-bold text-slate-800 leading-tight pr-5">${task.title}</h4>
-                    <button onclick="deleteTask('${task.id}')" class="text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all absolute right-3 top-3"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-                </div>
-                <p class="text-[11px] text-slate-400 line-clamp-2 mb-4 leading-relaxed">${task.desc || ''}</p>
-                <div class="flex items-center justify-between border-t border-slate-50 pt-3">
-                    <div class="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                        <i data-lucide="calendar" class="w-3 h-3 text-indigo-400"></i> ${task.date ? task.date.split('-').reverse().slice(0,2).join('.') : '---'}
-                    </div>
-                    <img src="${USERS[task.user]}" title="${task.user}" class="w-6 h-6 rounded-full border border-white ring-1 ring-slate-100 shadow-sm" />
-                </div>
-            `;
+            card.className = "bg-white p-4 rounded-2xl border border-slate-100 shadow-sm cursor-grab active:cursor-grabbing hover:border-indigo-300";
+            card.draggable = true;
+            card.ondragstart = (e) => e.dataTransfer.setData('text', t.id);
+            card.innerHTML = `<h4 class="text-sm font-bold text-slate-800 mb-1">${t.title}</h4>
+                             <p class="text-[11px] text-slate-500 mb-3">${t.desc || ''}</p>
+                             <div class="flex justify-between items-center pt-2 border-t text-[10px] font-bold text-slate-400 uppercase">
+                                <span>📅 ${t.date}</span><span>${t.user}</span>
+                             </div>`;
             return card;
         }
 
-        function openModal(col) { 
-            currentStatus = col; document.getElementById('edit-task-id').value = '';
-            document.getElementById('modal-title').innerText = 'Yeni İş Kalemi Ata';
-            document.getElementById('task-title').value = ''; document.getElementById('task-desc').value = '';
-            document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
-            document.getElementById('modal').classList.remove('hidden'); 
-        }
-
-        function openEditModal(id) {
-            const task = tasks.find(t => t.id === id);
-            if (!task) return;
-            document.getElementById('edit-task-id').value = id;
-            document.getElementById('modal-title').innerText = 'Görevi Düzenle';
-            document.getElementById('task-title').value = task.title;
-            document.getElementById('task-desc').value = task.desc;
-            document.getElementById('task-date').value = task.date;
-            document.getElementById('task-user').value = task.user;
-            document.getElementById('modal').classList.remove('hidden');
+        function drop(e, status) {
+            const id = e.dataTransfer.getData('text');
+            const task = tasks.find(t => t.id == id);
+            if(task) { task.status = status; task.archived = status === 'Done'; pushData(); }
         }
 
         function saveTask() {
-            const id = document.getElementById('edit-task-id').value;
             const title = document.getElementById('task-title').value;
-            const desc = document.getElementById('task-desc').value;
-            const date = document.getElementById('task-date').value;
             const user = document.getElementById('task-user').value;
-
-            if (!title) return;
-
-            if (id) {
-                const idx = tasks.findIndex(t => t.id === id);
-                tasks[idx] = { ...tasks[idx], title, desc, date, user };
-            } else {
-                tasks.push({ id: Date.now().toString(), title, desc, date, user, status: currentStatus, archived: false });
-            }
-            closeModal(); render();
+            if(!title) return;
+            tasks.push({ id: Date.now(), title, desc: document.getElementById('task-desc').value, date: document.getElementById('task-date').value, user, status: 'Todo', archived: false });
+            closeModal(); pushData();
         }
 
-        function allowDrop(e) { e.preventDefault(); }
-        function drop(e, status) {
-            e.preventDefault();
-            const id = e.dataTransfer.getData('text');
-            const task = tasks.find(t => t.id === id);
-            if (task) { 
-                task.status = status; 
-                task.archived = (status === 'Done'); 
-                render(); 
-            }
-        }
-
-        function switchTab(tab) {
-            activeTab = tab;
-            document.getElementById('board-view').classList.toggle('hidden', tab !== 'board');
-            document.getElementById('archive-view').classList.toggle('hidden', tab !== 'archive');
-            document.getElementById('nav-board').classList.toggle('active-nav', tab === 'board');
-            document.getElementById('nav-archive').classList.toggle('active-nav', tab === 'archive');
-            document.getElementById('page-title').innerText = tab === 'board' ? 'Bordro Takip Panosu' : 'Arşivlenmiş İşler';
-            render();
-        }
-
+        function switchTab(t) { activeTab = t; render(); }
+        function openModal() { document.getElementById('modal').classList.remove('hidden'); }
         function closeModal() { document.getElementById('modal').classList.add('hidden'); }
-        function deleteTask(id) { if(confirm('Bu işi silmek istediğinize emin misiniz?')) { tasks = tasks.filter(t => t.id !== id); render(); } }
-        function restoreTask(id) { const task = tasks.find(t => t.id === id); if(task) { task.archived = false; task.status = 'Todo'; render(); } }
+        function restore(id) { const t = tasks.find(x => x.id == id); t.archived = false; t.status = 'Todo'; pushData(); }
 
-        render();
+        fetchData();
     </script>
 </body>
 </html>
