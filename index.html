@@ -79,22 +79,31 @@
 
     <script>
         // --- BURAYA KENDI URL'NIZI YAPIŞTIRIN ---
-        const SHEET_API_URL = "https://script.google.com/a/macros/s/AKfycbwKeZ1TR03ZWDAyvER4Y5bxdC3Pu6-d4tXP9b6f2-coSqTY0e4A4kCwn6abB8L5Di_h/exec"; 
+        const SHEET_API_URL = "https://script.google.com/a/macros/s/AKfycbz5CbKBBL7yqL_cpAptgD3JLAr97NsFucdMkea9FSSzD7fqMqUyjmBMwY8fu_HzEGDb/exec"; 
 
         let tasks = [];
         let activeTab = 'board';
 
-        async function fetchData() {
+   async function fetchData() {
+            if(!SHEET_API_URL || SHEET_API_URL.includes("BURAYA")) return;
             document.getElementById('loader-overlay').style.display = 'flex';
             try {
                 const response = await fetch(SHEET_API_URL);
-                const data = await response.json();
-                tasks = data.slice(1).map(r => ({
+                const raw = await response.json();
+                
+                // GÜVENLİK KONTROLÜ
+                if(raw.error === "YETKISIZ_ERISIM") {
+                    alert("DİKKAT: " + raw.email + " adresi için bu panoya erişim yetkisi tanımlanmamış!");
+                    document.getElementById('app').innerHTML = "<h1 style='padding:50px; text-align:center;'>Bu sayfayı görmeye yetkiniz yok. Lütfen yönetici ile iletişime geçin.</h1>";
+                    return;
+                }
+
+                tasks = raw.slice(1).map(r => ({
                     id: String(r[0]), title: String(r[1]), desc: String(r[2]), 
                     date: String(r[3]), user: String(r[4]), status: String(r[5]), archived: String(r[6]).toUpperCase() === "TRUE"
                 }));
                 render();
-            } catch (e) { console.error("Veri çekilemedi", e); }
+            } catch (e) { console.error("Hata", e); }
             document.getElementById('loader-overlay').style.display = 'none';
         }
 
