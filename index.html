@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bordro Planner Pro - Final</title>
+    <title>Bordro Planner Pro - Canlı Ekip</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -33,7 +33,7 @@
             </nav>
             <div class="p-4 border-t">
                 <button onclick="fetchData()" class="w-full flex items-center justify-center gap-2 text-[10px] font-bold text-slate-400 hover:text-indigo-600 transition-all uppercase tracking-widest">
-                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> Zorla Güncelle
+                    <i data-lucide="refresh-cw" class="w-3 h-3"></i> Senkronize Et
                 </button>
             </div>
         </aside>
@@ -53,10 +53,14 @@
                     <button onclick="openModal('Todo')" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 hover:bg-indigo-700 transition-all text-xs">
                         <i data-lucide="plus" class="w-4 h-4"></i> Yeni İş Ata
                     </button>
+                    <div class="flex items-center gap-3 pl-4 border-l ml-2">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Eren" class="w-9 h-9 rounded-full border-2 border-indigo-50 shadow-sm" />
+                    </div>
                 </div>
             </header>
 
-            <div id="board-view" class="flex-1 overflow-x-auto p-6 bg-[#F4F7FB] flex gap-6 scrollbar-hide"></div>
+            <div id="board-view" class="flex-1 overflow-x-auto p-6 bg-[#F4F7FB] flex gap-6 scrollbar-hide">
+                </div>
 
             <div id="archive-view" class="hidden flex-1 p-8 overflow-y-auto bg-slate-50">
                 <div id="archive-list" class="max-w-4xl mx-auto space-y-4"></div>
@@ -69,11 +73,11 @@
             <h2 id="modal-title" class="text-xl font-bold mb-6 text-slate-800">İş Detayı</h2>
             <input type="hidden" id="edit-id">
             <div class="space-y-4">
-                <input id="task-title" type="text" placeholder="Başlık" class="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 ring-indigo-500">
+                <input id="task-title" type="text" placeholder="İş Başlığı" class="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 ring-indigo-500">
                 <textarea id="task-desc" placeholder="Açıklama" class="w-full p-3 bg-slate-50 border rounded-xl h-24 outline-none focus:ring-2 ring-indigo-500"></textarea>
                 <div class="grid grid-cols-2 gap-4">
-                    <input id="task-date" type="date" class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
-                    <select id="task-user" class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                    <input id="task-date" type="date" class="w-full p-3 bg-slate-50 border rounded-xl">
+                    <select id="task-user" class="w-full p-3 bg-slate-50 border rounded-xl">
                         <option value="Eren">Eren Şenyurt</option>
                         <option value="Pinar">Pınar Zengin</option>
                         <option value="Oguz">Oğuz Güleç</option>
@@ -88,36 +92,32 @@
     </div>
 
     <script>
-        // --- BURAYA KENDİ URL'NİZİ YAPIŞTIRIN ---
+        // URL'yi buraya ekleyin
         const SHEET_API_URL = "https://script.google.com/a/macros/defacto.com/s/AKfycbwaXafcEsUmURSNZ0Pmz_GGklzPnLfG6TQtmEGZyYNWH6l3jjXS6KQ-iZtZ9GUz1B1d/exec"; 
-
-        const USERS = { 'Eren': 'Eren', 'Pinar': 'Pinar', 'Oguz': 'Oguz' };
-        const COLS = { 'Backlog': 'bg-slate-400', 'Todo': 'bg-amber-400', 'InProgress': 'bg-blue-500', 'Done': 'bg-emerald-500' };
 
         let tasks = [];
         let activeTab = 'board';
         let currentStatus = 'Todo';
 
+        // VERİ ÇEKME
         async function fetchData() {
             try {
-                const response = await fetch(SHEET_API_URL + "?t=" + new Date().getTime());
-                const raw = await response.json();
-                if(raw.error === "YETKISIZ_ERISIM") return;
+                const res = await fetch(SHEET_API_URL + "?t=" + new Date().getTime());
+                const data = await res.json();
+                if(data.error === "YETKISIZ_ERISIM") return;
                 
-                // Başlık satırını atla ve verileri al
-                if (raw.length > 1) {
-                    tasks = raw.slice(1).map(r => ({
+                if (data.length > 1) {
+                    tasks = data.slice(1).map(r => ({
                         id: String(r[0]), title: String(r[1]), desc: String(r[2]), 
                         date: String(r[3]), user: String(r[4]), status: String(r[5]), 
                         archived: String(r[6]).toUpperCase() === "TRUE"
                     }));
-                } else {
-                    tasks = [];
                 }
                 render();
-            } catch (e) { console.error("Veri Çekme Hatası:", e); }
+            } catch (e) { console.error("Hata:", e); }
         }
 
+        // VERİ GÖNDERME
         async function pushData() {
             render(); // Önce ekranda göster
             try {
@@ -126,39 +126,39 @@
                     mode: 'no-cors',
                     body: JSON.stringify(tasks)
                 });
-                setTimeout(fetchData, 1500); // 1.5 sn sonra buluttan doğrula
+                // no-cors yanıt beklemeyi engeller, sistem akışına devam eder
             } catch (e) { console.error("Kayıt Hatası:", e); }
         }
 
         function render() {
             const board = document.getElementById('board-view');
             const archive = document.getElementById('archive-list');
-            const userFilter = document.getElementById('user-filter').value;
+            const filterUser = document.getElementById('user-filter').value;
             
             board.innerHTML = ''; archive.innerHTML = '';
-            let filtered = (userFilter === 'all') ? tasks : tasks.filter(t => t.user === userFilter);
+            let filtered = (filterUser === 'all') ? tasks : tasks.filter(t => t.user === filterUser);
 
             if (activeTab === 'board') {
-                Object.keys(COLS).forEach(colId => {
-                    const colTasks = filtered.filter(t => t.status === colId && !t.archived);
+                ['Backlog', 'Todo', 'InProgress', 'Done'].forEach(status => {
+                    const colTasks = filtered.filter(t => t.status === status && !t.archived);
                     const colDiv = document.createElement('div');
                     colDiv.className = 'kanban-col flex flex-col gap-4';
                     colDiv.innerHTML = `
                         <div class="flex items-center justify-between px-2">
                             <div class="flex items-center gap-2 font-bold text-[11px] text-slate-400 uppercase tracking-widest">
-                                <div class="w-2 h-2 rounded-full ${COLS[colId]}"></div> ${colId} (${colTasks.length})
+                                <span class="w-2 h-2 rounded-full ${status==='Todo'?'bg-amber-400':status==='Done'?'bg-emerald-500':'bg-blue-500'}"></span>
+                                ${status} (${colTasks.length})
                             </div>
-                            <button onclick="openModal('${colId}')" class="text-slate-300 hover:text-indigo-600 transition-all"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                            <button onclick="openModal('${status}')" class="text-slate-300 hover:text-indigo-600"><i data-lucide="plus" class="w-4 h-4"></i></button>
                         </div>
-                        <div id="${colId}" class="flex-1 space-y-3 min-h-[150px] p-1 rounded-xl" ondragover="event.preventDefault()" ondrop="drop(event, '${colId}')"></div>
+                        <div id="list-${status}" class="flex-1 space-y-3 min-h-[150px] p-1" ondragover="event.preventDefault()" ondrop="drop(event, '${status}')"></div>
                     `;
                     board.appendChild(colDiv);
-                    const listDiv = colDiv.querySelector(`#${colId}`);
-                    colTasks.forEach(task => listDiv.appendChild(createCard(task)));
+                    const listArea = document.getElementById(`list-${status}`);
+                    colTasks.forEach(task => listArea.appendChild(createCard(task)));
                 });
             } else {
-                const archivedTasks = filtered.filter(t => t.archived);
-                archivedTasks.forEach(task => {
+                filtered.filter(t => t.archived).forEach(task => {
                     const div = document.createElement('div');
                     div.className = "bg-white p-5 rounded-2xl border flex justify-between items-center shadow-sm";
                     div.innerHTML = `<div><h4 class="font-bold text-slate-800">${task.title}</h4><p class="text-xs text-slate-400">${task.user} - ${task.date}</p></div>
@@ -171,30 +171,23 @@
 
         function createCard(t) {
             const card = document.createElement('div');
-            card.className = "bg-white p-4 rounded-2xl border border-slate-100 card-shadow cursor-grab active:cursor-grabbing hover:border-indigo-300 transition-all group relative";
+            card.className = "bg-white p-4 rounded-2xl border border-slate-100 card-shadow cursor-grab hover:border-indigo-300 transition-all group relative";
             card.draggable = true; card.id = t.id;
             card.ondragstart = (e) => { e.dataTransfer.setData('text', t.id); card.classList.add('dragging'); };
-            card.ondragend = () => card.classList.remove('dragging');
             card.onclick = (e) => { if(!e.target.closest('button')) openEditModal(t.id); };
-            
             card.innerHTML = `
                 <div class="flex justify-between items-start mb-2">
                     <h4 class="text-sm font-bold text-slate-800 leading-tight pr-4">${t.title}</h4>
                     <button onclick="deleteTask('${t.id}')" class="text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 absolute top-4 right-4"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                 </div>
-                <p class="text-[11px] text-slate-400 line-clamp-2 mb-4 leading-relaxed">${t.desc || ''}</p>
-                <div class="flex items-center justify-between border-t border-slate-50 pt-3">
-                    <div class="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter"><i data-lucide="calendar" class="w-3 h-3 text-indigo-400"></i> ${t.date}</div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-[9px] font-bold text-slate-400">${t.user.toUpperCase()}</span>
-                    </div>
+                <div class="mt-4 flex justify-between items-center text-[9px] font-bold text-slate-400 uppercase">
+                    <span>📅 ${t.date}</span><span class="text-indigo-600">${t.user}</span>
                 </div>
             `;
             return card;
         }
 
         function drop(e, status) {
-            e.preventDefault();
             const id = e.dataTransfer.getData('text');
             const task = tasks.find(t => t.id === id);
             if (task) {
@@ -204,38 +197,15 @@
             }
         }
 
-        function openModal(col = 'Todo') {
-            currentStatus = col;
-            document.getElementById('edit-id').value = '';
-            document.getElementById('modal-title').innerText = 'Yeni İş Kalemi Ata';
-            document.getElementById('task-title').value = '';
-            document.getElementById('task-desc').value = '';
-            document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
-            document.getElementById('modal').classList.remove('hidden');
-            lucide.createIcons();
-        }
-
-        function openEditModal(id) {
-            const task = tasks.find(t => t.id === id);
-            if (!task) return;
-            document.getElementById('edit-id').value = id;
-            document.getElementById('modal-title').innerText = 'Görevi Düzenle';
-            document.getElementById('task-title').value = task.title;
-            document.getElementById('task-desc').value = task.desc;
-            document.getElementById('task-date').value = task.date;
-            document.getElementById('task-user').value = task.user;
-            document.getElementById('modal').classList.remove('hidden');
-            lucide.createIcons();
-        }
-
         function saveTask() {
             const id = document.getElementById('edit-id').value;
             const title = document.getElementById('task-title').value;
-            if (!title) return alert("Başlık gerekli.");
-            
+            if(!title) return;
+
             const tData = {
                 id: id || Date.now().toString(),
-                title, desc: document.getElementById('task-desc').value,
+                title: title,
+                desc: document.getElementById('task-desc').value,
                 date: document.getElementById('task-date').value,
                 user: document.getElementById('task-user').value,
                 status: id ? tasks.find(x => x.id === id).status : currentStatus,
@@ -245,25 +215,32 @@
             if (id) { const idx = tasks.findIndex(x => x.id === id); tasks[idx] = tData; }
             else { tasks.push(tData); }
             
-            closeModal(); pushData();
+            closeModal();
+            pushData();
         }
 
-        function switchTab(t) {
-            activeTab = t;
-            document.getElementById('board-view').classList.toggle('hidden', t !== 'board');
-            document.getElementById('archive-view').classList.toggle('hidden', t !== 'archive');
-            document.getElementById('nav-board').classList.toggle('active-nav', t === 'board');
-            document.getElementById('nav-archive').classList.toggle('active-nav', t === 'archive');
-            document.getElementById('page-title').innerText = (t === 'board') ? 'Canlı İş Panosu' : 'Arşivlenmiş İşler';
-            render();
+        function openModal(status = 'Todo') { 
+            currentStatus = status; document.getElementById('edit-id').value = ''; 
+            document.getElementById('task-title').value = ''; document.getElementById('modal').classList.remove('hidden'); 
+        }
+
+        function openEditModal(id) {
+            const t = tasks.find(x => x.id === id);
+            document.getElementById('edit-id').value = id;
+            document.getElementById('task-title').value = t.title;
+            document.getElementById('task-desc').value = t.desc;
+            document.getElementById('task-date').value = t.date;
+            document.getElementById('task-user').value = t.user;
+            document.getElementById('modal').classList.remove('hidden');
         }
 
         function closeModal() { document.getElementById('modal').classList.add('hidden'); }
-        function deleteTask(id) { if(confirm('Silmek istiyor musunuz?')) { tasks = tasks.filter(x => x.id !== id); pushData(); } }
-        function restoreTask(id) { const t = tasks.find(x => x.id === id); if(t) { t.archived = false; t.status = 'Todo'; pushData(); } }
+        function deleteTask(id) { if(confirm('Sil?')) { tasks = tasks.filter(x => x.id !== id); pushData(); } }
+        function restoreTask(id) { const t = tasks.find(x => x.id === id); t.archived = false; t.status = 'Todo'; pushData(); }
+        function switchTab(t) { activeTab = t; render(); }
 
         fetchData();
-        setInterval(fetchData, 5000); // 5 saniyede bir otomatik güncelleme
+        setInterval(fetchData, 5000); 
     </script>
 </body>
 </html>
