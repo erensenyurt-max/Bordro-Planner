@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bordro Planner Pro - Canlı Senkronizasyon</title>
+    <title>Bordro Planner Pro - Final</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -13,6 +13,7 @@
         .active-nav { background-color: #EEF2FF; color: #4F46E5; font-weight: 700; }
         .card-shadow { box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .dragging { opacity: 0.5; }
     </style>
 </head>
 <body>
@@ -41,7 +42,6 @@
             <header class="h-20 bg-white border-b flex items-center justify-between px-8 shrink-0">
                 <div class="flex items-center gap-4">
                     <h1 id="page-title" class="text-xl font-bold text-slate-800">Canlı İş Panosu</h1>
-                    <div class="h-6 w-[1px] bg-slate-200 mx-2"></div>
                     <select id="user-filter" onchange="render()" class="bg-white border border-slate-200 rounded-full px-4 py-1.5 text-xs font-semibold text-slate-600 outline-none cursor-pointer">
                         <option value="all">Filtrele: Tüm Ekip</option>
                         <option value="Eren">Eren Şenyurt</option>
@@ -53,9 +53,6 @@
                     <button onclick="openModal('Todo')" class="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow-lg flex items-center gap-2 hover:bg-indigo-700 transition-all text-xs">
                         <i data-lucide="plus" class="w-4 h-4"></i> Yeni İş Ata
                     </button>
-                    <div class="flex items-center gap-3 pl-4 border-l ml-2">
-                        <img id="my-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=Eren" class="w-9 h-9 rounded-full border-2 border-indigo-50" />
-                    </div>
                 </div>
             </header>
 
@@ -72,11 +69,11 @@
             <h2 id="modal-title" class="text-xl font-bold mb-6 text-slate-800">İş Detayı</h2>
             <input type="hidden" id="edit-id">
             <div class="space-y-4">
-                <input id="task-title" type="text" placeholder="İş Başlığı" class="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 ring-indigo-500">
+                <input id="task-title" type="text" placeholder="Başlık" class="w-full p-3 bg-slate-50 border rounded-xl outline-none focus:ring-2 ring-indigo-500">
                 <textarea id="task-desc" placeholder="Açıklama" class="w-full p-3 bg-slate-50 border rounded-xl h-24 outline-none focus:ring-2 ring-indigo-500"></textarea>
                 <div class="grid grid-cols-2 gap-4">
-                    <input id="task-date" type="date" class="w-full p-3 bg-slate-50 border rounded-xl">
-                    <select id="task-user" class="w-full p-3 bg-slate-50 border rounded-xl">
+                    <input id="task-date" type="date" class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
+                    <select id="task-user" class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
                         <option value="Eren">Eren Şenyurt</option>
                         <option value="Pinar">Pınar Zengin</option>
                         <option value="Oguz">Oğuz Güleç</option>
@@ -85,7 +82,7 @@
             </div>
             <div class="flex justify-end gap-3 mt-8">
                 <button onclick="closeModal()" class="px-6 py-2 text-slate-400 font-bold">Vazgeç</button>
-                <button onclick="saveTask()" class="bg-indigo-600 text-white px-10 py-3 rounded-xl font-bold">Görevi Kaydet</button>
+                <button onclick="saveTask()" class="bg-indigo-600 text-white px-10 py-3 rounded-xl font-bold shadow-lg">Görevi Kaydet</button>
             </div>
         </div>
     </div>
@@ -107,33 +104,39 @@
                 const raw = await response.json();
                 if(raw.error === "YETKISIZ_ERISIM") return;
                 
-                // Tablodaki veriyi doğru eşle
-                tasks = raw.slice(1).map(r => ({
-                    id: String(r[0]), title: String(r[1]), desc: String(r[2]), 
-                    date: String(r[3]), user: String(r[4]), status: String(r[5]), 
-                    archived: String(r[6]).toUpperCase() === "TRUE"
-                }));
+                // Başlık satırını atla ve verileri al
+                if (raw.length > 1) {
+                    tasks = raw.slice(1).map(r => ({
+                        id: String(r[0]), title: String(r[1]), desc: String(r[2]), 
+                        date: String(r[3]), user: String(r[4]), status: String(r[5]), 
+                        archived: String(r[6]).toUpperCase() === "TRUE"
+                    }));
+                } else {
+                    tasks = [];
+                }
                 render();
             } catch (e) { console.error("Veri Çekme Hatası:", e); }
         }
 
         async function pushData() {
             render(); // Önce ekranda göster
-            await fetch(SHEET_API_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify(tasks)
-            });
-            setTimeout(fetchData, 1500); // 1.5 sn sonra buluttan doğrula
+            try {
+                await fetch(SHEET_API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(tasks)
+                });
+                setTimeout(fetchData, 1500); // 1.5 sn sonra buluttan doğrula
+            } catch (e) { console.error("Kayıt Hatası:", e); }
         }
 
         function render() {
             const board = document.getElementById('board-view');
             const archive = document.getElementById('archive-list');
-            const filterUser = document.getElementById('user-filter').value;
+            const userFilter = document.getElementById('user-filter').value;
             
             board.innerHTML = ''; archive.innerHTML = '';
-            let filtered = filterUser === 'all' ? tasks : tasks.filter(t => t.user === filterUser);
+            let filtered = (userFilter === 'all') ? tasks : tasks.filter(t => t.user === userFilter);
 
             if (activeTab === 'board') {
                 Object.keys(COLS).forEach(colId => {
@@ -150,14 +153,16 @@
                         <div id="${colId}" class="flex-1 space-y-3 min-h-[150px] p-1 rounded-xl" ondragover="event.preventDefault()" ondrop="drop(event, '${colId}')"></div>
                     `;
                     board.appendChild(colDiv);
-                    colTasks.forEach(task => colDiv.querySelector('.flex-1').appendChild(createCard(task)));
+                    const listDiv = colDiv.querySelector(`#${colId}`);
+                    colTasks.forEach(task => listDiv.appendChild(createCard(task)));
                 });
             } else {
-                filtered.filter(t => t.archived).forEach(task => {
+                const archivedTasks = filtered.filter(t => t.archived);
+                archivedTasks.forEach(task => {
                     const div = document.createElement('div');
-                    div.className = "bg-white p-5 rounded-2xl border flex items-center justify-between shadow-sm hover:border-indigo-200 transition-all";
-                    div.innerHTML = `<div><h4 class="font-bold text-slate-800">${task.title}</h4><p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">📅 ${task.date} • SORUMLU: ${task.user}</p></div>
-                                    <button onclick="restoreTask('${task.id}')" class="bg-indigo-50 text-indigo-600 px-4 py-1.5 rounded-lg text-xs font-bold">Panoya Geri Al</button>`;
+                    div.className = "bg-white p-5 rounded-2xl border flex justify-between items-center shadow-sm";
+                    div.innerHTML = `<div><h4 class="font-bold text-slate-800">${task.title}</h4><p class="text-xs text-slate-400">${task.user} - ${task.date}</p></div>
+                                    <button onclick="restoreTask('${task.id}')" class="bg-indigo-50 text-indigo-600 px-4 py-1.5 rounded-lg text-xs font-bold">Geri Al</button>`;
                     archive.appendChild(div);
                 });
             }
@@ -166,10 +171,10 @@
 
         function createCard(t) {
             const card = document.createElement('div');
-            card.className = "bg-white p-4 rounded-2xl border border-slate-100 card-shadow cursor-grab hover:border-indigo-300 transition-all group relative";
+            card.className = "bg-white p-4 rounded-2xl border border-slate-100 card-shadow cursor-grab active:cursor-grabbing hover:border-indigo-300 transition-all group relative";
             card.draggable = true; card.id = t.id;
-            card.ondragstart = (e) => { e.dataTransfer.setData('text', t.id); card.classList.add('opacity-40'); };
-            card.ondragend = () => card.classList.remove('opacity-40');
+            card.ondragstart = (e) => { e.dataTransfer.setData('text', t.id); card.classList.add('dragging'); };
+            card.ondragend = () => card.classList.remove('dragging');
             card.onclick = (e) => { if(!e.target.closest('button')) openEditModal(t.id); };
             
             card.innerHTML = `
@@ -182,7 +187,6 @@
                     <div class="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-tighter"><i data-lucide="calendar" class="w-3 h-3 text-indigo-400"></i> ${t.date}</div>
                     <div class="flex items-center gap-2">
                         <span class="text-[9px] font-bold text-slate-400">${t.user.toUpperCase()}</span>
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${t.user}" class="w-6 h-6 rounded-full border shadow-sm" />
                     </div>
                 </div>
             `;
@@ -190,6 +194,7 @@
         }
 
         function drop(e, status) {
+            e.preventDefault();
             const id = e.dataTransfer.getData('text');
             const task = tasks.find(t => t.id === id);
             if (task) {
@@ -207,6 +212,7 @@
             document.getElementById('task-desc').value = '';
             document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
             document.getElementById('modal').classList.remove('hidden');
+            lucide.createIcons();
         }
 
         function openEditModal(id) {
@@ -219,6 +225,7 @@
             document.getElementById('task-date').value = task.date;
             document.getElementById('task-user').value = task.user;
             document.getElementById('modal').classList.remove('hidden');
+            lucide.createIcons();
         }
 
         function saveTask() {
@@ -247,6 +254,7 @@
             document.getElementById('archive-view').classList.toggle('hidden', t !== 'archive');
             document.getElementById('nav-board').classList.toggle('active-nav', t === 'board');
             document.getElementById('nav-archive').classList.toggle('active-nav', t === 'archive');
+            document.getElementById('page-title').innerText = (t === 'board') ? 'Canlı İş Panosu' : 'Arşivlenmiş İşler';
             render();
         }
 
@@ -255,7 +263,7 @@
         function restoreTask(id) { const t = tasks.find(x => x.id === id); if(t) { t.archived = false; t.status = 'Todo'; pushData(); } }
 
         fetchData();
-        setInterval(fetchData, 5000); // 5 saniyede bir herkes için anlık senkronize et
+        setInterval(fetchData, 5000); // 5 saniyede bir otomatik güncelleme
     </script>
 </body>
 </html>
