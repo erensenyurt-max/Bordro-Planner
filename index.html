@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planner Pro - Full Sync</title>
+    <title>Planner Pro - Full Sync & Report</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -26,10 +26,20 @@
             </div>
             
             <div class="flex items-center gap-4">
+                <div id="date-filters" class="hidden flex items-center gap-2 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+                    <input type="date" id="start-date" onchange="render()" class="bg-transparent text-xs font-bold outline-none">
+                    <span class="text-slate-300">-</span>
+                    <input type="date" id="end-date" onchange="render()" class="bg-transparent text-xs font-bold outline-none">
+                </div>
+
                 <select id="user-filter" onchange="render()" class="bg-slate-50 border-none rounded-2xl px-6 py-3 text-sm font-bold outline-none cursor-pointer">
                     <option value="all">Tüm Ekip</option>
                     <option value="Eren">Eren Şenyurt</option>
+                    <option value="Pinar">Pınar Zengin</option>
+                    <option value="Burcu">Burcu Gülbaz Ünlü</option>
+                    <option value="Ebru">Ebru Bulut</option>
                     <option value="Oguz">Oğuz Güleç</option>
+                    <option value="Yasin">Yasin Alper</option>
                 </select>
                 <button onclick="openModal()" class="bg-indigo-600 text-white px-8 py-3 rounded-[1.5rem] font-bold shadow-lg shadow-indigo-100 hover:scale-105 transition-transform">+ Yeni İş Ata</button>
             </div>
@@ -50,7 +60,11 @@
                     <input id="task-date" type="date" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-slate-600">
                     <select id="task-user" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
                         <option value="Eren">Eren Şenyurt</option>
+                        <option value="Pinar">Pınar Zengin</option>
+                        <option value="Burcu">Burcu Gülbaz Ünlü</option>
+                        <option value="Ebru">Ebru Bulut</option>
                         <option value="Oguz">Oğuz Güleç</option>
+                        <option value="Yasin">Yasin Alper</option>
                     </select>
                 </div>
             </div>
@@ -62,8 +76,7 @@
     </div>
 
     <script>
-        // BURAYA KENDI URL'NIZI YAPIŞTIRIN
-        const API_URL = "https://script.google.com/macros/s/AKfycbyqwdl2JiFqExUTGD6iDYiPJho68Hc1izzuJzxNJMRkhsAm2o7E-4rROGN4T74bpbAN/exec";
+        const API_URL = "https://script.google.com/a/macros/s/AKfycbwzQKDqHUuPlsZvYn5PnNpYFKOcx6CKT0Sn_WNw7IPT-QMhgZ3Sjvnk9CDYgVk1CToY/exec";
 
         let tasks = JSON.parse(localStorage.getItem('planner_tasks')) || [];
         let activeTab = 'board';
@@ -77,7 +90,7 @@
                     localStorage.setItem('planner_tasks', JSON.stringify(tasks));
                     render();
                 }
-            } catch (e) { console.error("Sheets verisi çekilemedi, yerel veri kullanılıyor."); render(); }
+            } catch (e) { console.error("Veri çekme hatası."); render(); }
         }
 
         async function sync() {
@@ -96,11 +109,15 @@
             const board = document.getElementById('board-view');
             const archive = document.getElementById('archive-view');
             const filter = document.getElementById('user-filter').value;
+            const startD = document.getElementById('start-date').value;
+            const endD = document.getElementById('end-date').value;
             
             board.innerHTML = ''; archive.innerHTML = '';
 
             if (activeTab === 'board') {
                 board.classList.remove('hidden'); archive.classList.add('hidden');
+                document.getElementById('date-filters').classList.add('hidden');
+                
                 const cols = ['Backlog', 'Todo', 'InProgress', 'Done'];
                 cols.forEach(status => {
                     const colTasks = tasks.filter(t => t.status === status && !t.archived && (filter === 'all' || t.user === filter));
@@ -118,7 +135,20 @@
                 });
             } else {
                 board.classList.add('hidden'); archive.classList.remove('hidden');
-                tasks.filter(t => t.archived && (filter === 'all' || t.user === filter)).forEach(t => {
+                document.getElementById('date-filters').classList.remove('hidden');
+
+                let archivedList = tasks.filter(t => (t.archived || t.status === 'Done') && (filter === 'all' || t.user === filter));
+
+                // Tarih Filtreleme Mantığı
+                if (startD && endD) {
+                    archivedList = archivedList.filter(t => t.date >= startD && t.date <= endD);
+                }
+
+                if (archivedList.length === 0) {
+                    archive.innerHTML = '<div class="col-span-full text-center py-20 text-slate-400 font-bold">Bu kriterlere uygun iş bulunamadı.</div>';
+                }
+
+                archivedList.forEach(t => {
                     archive.appendChild(createCard(t, true));
                 });
             }
@@ -161,7 +191,7 @@
                 id: Date.now().toString(),
                 title: title,
                 desc: document.getElementById('task-desc').value,
-                date: document.getElementById('task-date').value || new Date().toLocaleDateString(),
+                date: document.getElementById('task-date').value || new Date().toISOString().split('T')[0],
                 user: document.getElementById('task-user').value,
                 status: 'Todo',
                 archived: false
@@ -175,6 +205,7 @@
 
         function openModal() { document.getElementById('modal').classList.remove('hidden'); }
         function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+        
         function switchTab(tab) {
             activeTab = tab;
             document.getElementById('btn-board').classList.toggle('active-tab', tab === 'board');
@@ -183,7 +214,7 @@
         }
 
         fetchData();
-        setInterval(fetchData, 60000); // 1 dakikada bir Sheets'ten güncelle
+        setInterval(fetchData, 5000); // Toplantı anında canlılık için 5 saniye yaptık
     </script>
 </body>
 </html>
