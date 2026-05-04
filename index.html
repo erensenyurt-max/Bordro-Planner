@@ -2,148 +2,101 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bordro Planner - Kesin Çözüm</title>
+    <title>Bordro Planner Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #F1F5F9; }
-        .kanban-col { min-width: 300px; height: calc(100vh - 120px); }
-        #loader { position: fixed; inset: 0; background: white; z-index: 1000; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #F8FAFC; }
+        .kanban-col { min-width: 280px; height: 80vh; }
     </style>
 </head>
-<body>
-    <div id="loader">
-        <div class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p class="font-bold text-indigo-600">Veriler Senkronize Ediliyor...</p>
+<body class="p-4">
+    <div id="app">
+        <div class="flex justify-between items-center mb-8 bg-white p-4 rounded-2xl shadow-sm">
+            <h1 class="text-xl font-bold text-indigo-600">Bordro Planner</h1>
+            <div class="flex gap-4">
+                <button onclick="fetchData()" class="px-4 py-2 text-xs font-bold text-slate-400 border rounded-xl hover:bg-slate-50">YENİLE</button>
+                <button onclick="openModal()" class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold">+ Yeni İş</button>
+            </div>
+        </div>
+        
+        <div id="board" class="flex gap-6 overflow-x-auto pb-4">
+            </div>
     </div>
 
-    <div class="flex h-screen">
-        <aside class="w-64 bg-white border-r p-6 flex flex-col">
-            <h1 class="text-2xl font-black text-indigo-600 mb-8">Planner PRO</h1>
-            <nav class="flex-1 space-y-2">
-                <button onclick="location.reload()" class="w-full text-left p-3 hover:bg-slate-100 rounded-xl font-semibold">🔄 Sayfayı Yenile</button>
-            </nav>
-            <div id="status-dot" class="text-[10px] font-bold text-emerald-500 flex items-center gap-2">
-                <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> SİSTEM ÇEVRİMİÇİ
-            </div>
-        </aside>
-
-        <main class="flex-1 flex flex-col overflow-hidden">
-            <header class="h-20 bg-white border-b flex items-center justify-between px-8">
-                <select id="user-filter" onchange="render()" class="bg-slate-50 border rounded-full px-4 py-2 text-sm font-bold outline-none">
-                    <option value="all">Tüm Ekip</option>
-                    <option value="Eren">Eren Şenyurt</option>
-                    <option value="Oguz">Oğuz Güleç</option>
-                </select>
-                <button onclick="openModal()" class="bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 shadow-lg">+ Yeni İş</button>
-            </header>
-
-            <div id="board-view" class="flex-1 p-6 flex gap-6 overflow-x-auto"></div>
-        </main>
-    </div>
-
-    <div id="modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[1100]">
-        <div class="bg-white w-[400px] p-8 rounded-3xl shadow-2xl">
-            <h2 class="text-xl font-bold mb-6">Yeni İş Detayı</h2>
-            <div class="space-y-4">
-                <input id="task-title" type="text" placeholder="Başlık" class="w-full p-3 bg-slate-50 border rounded-xl outline-none">
-                <select id="task-user" class="w-full p-3 bg-slate-50 border rounded-xl font-bold">
-                    <option value="Eren">Eren Şenyurt</option>
-                    <option value="Oguz">Oğuz Güleç</option>
-                </select>
-                <input id="task-date" type="date" class="w-full p-3 bg-slate-50 border rounded-xl">
-            </div>
-            <div class="flex justify-end gap-3 mt-8">
-                <button onclick="closeModal()" class="text-slate-400 font-bold">İptal</button>
-                <button onclick="saveTask()" class="bg-indigo-600 text-white px-8 py-2 rounded-xl font-bold">Kaydet</button>
-            </div>
+    <div id="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-3xl w-96">
+            <h2 class="font-bold mb-4">Yeni Görev</h2>
+            <input id="title" class="w-full border p-2 mb-2 rounded-lg" placeholder="Başlık">
+            <select id="user" class="w-full border p-2 mb-4 rounded-lg">
+                <option value="Eren">Eren</option>
+                <option value="Oguz">Oğuz</option>
+            </select>
+            <button onclick="saveTask()" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold">KAYDET</button>
+            <button onclick="closeModal()" class="w-full mt-2 text-slate-400 text-sm">Vazgeç</button>
         </div>
     </div>
 
     <script>
-        // BURAYA YENİ APPS SCRIPT URL'NİZİ YAPIŞTIRIN
-        const URL = "https://script.google.com/a/macros/defacto.com/s/AKfycbx_TXguqaQ0EJbAmD008Rp3BbdE-ymEf8KnEkskAQC_PR8qWLIeXvgwreVd9iQNEYmM/exec"; 
-        let tasks = JSON.parse(localStorage.getItem('backup_tasks')) || [];
+        const API_URL = "https://script.google.com/a/macros/defacto.com/s/AKfycbyqwdl2JiFqExUTGD6iDYiPJho68Hc1izzuJzxNJMRkhsAm2o7E-4rROGN4T74bpbAN/exec";
+        let tasks = [];
 
         async function fetchData() {
             try {
-                const res = await fetch(URL + "?t=" + Date.now());
-                const data = await res.json();
-                if(Array.isArray(data)) {
-                    tasks = data;
-                    localStorage.setItem('backup_tasks', JSON.stringify(tasks));
-                }
+                const r = await fetch(API_URL + "?t=" + Date.now());
+                const d = await r.json();
+                console.log("Gelen Veri:", d); // Tarayıcı konsoluna sağ tık - incele diyerek bakın
+                tasks = Array.isArray(d) ? d : [];
                 render();
-            } catch (e) { 
-                console.log("Çevrimdışı Mod: Yedekler Yükleniyor.");
-                render();
+            } catch (e) {
+                console.error("Hata:", e);
+                alert("Veri çekilemedi. Apps Script URL'sini kontrol edin.");
             }
-            document.getElementById('loader').style.display = 'none';
         }
 
         async function pushData() {
-            localStorage.setItem('backup_tasks', JSON.stringify(tasks));
             render();
-            try {
-                await fetch(URL, {
-                    method: 'POST',
-                    mode: 'no-cors', // Google Apps Script için bu şarttır
-                    cache: 'no-cache',
-                    body: JSON.stringify(tasks)
-                });
-                console.log("Veri gönderildi (onay beklenmiyor)");
-            } catch (e) { console.error("Kayıt Hatası", e); }
+            await fetch(API_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify(tasks)
+            });
+            setTimeout(fetchData, 1500);
         }
 
         function render() {
-            const board = document.getElementById('board-view');
-            const filter = document.getElementById('user-filter').value;
-            board.innerHTML = '';
+            const container = document.getElementById('board');
+            container.innerHTML = '';
+            const statuses = ['Backlog', 'Todo', 'InProgress', 'Done'];
             
-            const cols = ['Backlog', 'Todo', 'InProgress', 'Done'];
-            cols.forEach(status => {
-                const colTasks = tasks.filter(t => t.status === status && (filter === 'all' || t.user === filter));
-                const colDiv = document.createElement('div');
-                colDiv.className = 'kanban-col flex flex-col gap-4';
-                colDiv.innerHTML = `
-                    <div class="flex justify-between items-center px-2">
-                        <span class="font-bold text-xs text-slate-400 uppercase">${status}</span>
-                        <span class="bg-slate-200 text-[10px] px-2 py-0.5 rounded-full font-bold">${colTasks.length}</span>
-                    </div>
-                    <div id="${status}" class="flex-1 space-y-3" ondragover="event.preventDefault()" ondrop="drop(event, '${status}')"></div>
-                `;
-                board.appendChild(colDiv);
+            statuses.forEach(s => {
+                const colTasks = tasks.filter(t => t.status === s);
+                const col = document.createElement('div');
+                col.className = 'kanban-col bg-slate-100/50 p-4 rounded-2xl border-2 border-dashed border-slate-200';
+                col.innerHTML = `<h3 class="font-bold text-slate-400 text-xs mb-4 uppercase">${s} (${colTasks.length})</h3>`;
+                
                 colTasks.forEach(t => {
                     const card = document.createElement('div');
-                    card.className = "bg-white p-4 rounded-2xl shadow-sm border border-slate-100 cursor-move hover:border-indigo-500 transition-all";
-                    card.draggable = true;
-                    card.ondragstart = (e) => e.dataTransfer.setData('text', t.id);
-                    card.innerHTML = `<h4 class="font-bold text-sm text-slate-800">${t.title}</h4>
-                                     <div class="flex justify-between mt-4 text-[10px] font-bold text-indigo-600">
-                                        <span>${t.user}</span><span>${t.date}</span>
-                                     </div>`;
-                    colDiv.querySelector('.flex-1').appendChild(card);
+                    card.className = 'bg-white p-4 rounded-xl shadow-sm mb-3 border border-slate-200';
+                    card.innerHTML = `<div class="font-bold text-sm text-slate-800">${t.title}</div>
+                                     <div class="text-[10px] text-indigo-500 font-bold mt-2 uppercase">${t.user}</div>`;
+                    col.appendChild(card);
                 });
+                container.appendChild(col);
             });
         }
 
-        function drop(e, newStatus) {
-            const id = e.dataTransfer.getData('text');
-            const task = tasks.find(t => t.id === id);
-            if(task) { task.status = newStatus; pushData(); }
-        }
-
         function saveTask() {
-            const t = {
+            const title = document.getElementById('title').value;
+            if(!title) return;
+            tasks.push({
                 id: Date.now().toString(),
-                title: document.getElementById('task-title').value,
-                user: document.getElementById('task-user').value,
-                date: document.getElementById('task-date').value,
-                status: 'Todo', archived: false
-            };
-            if(!t.title) return;
-            tasks.push(t);
+                title: title,
+                user: document.getElementById('user').value,
+                status: 'Todo',
+                archived: false,
+                date: new Date().toLocaleDateString()
+            });
             closeModal();
             pushData();
         }
@@ -152,7 +105,6 @@
         function closeModal() { document.getElementById('modal').classList.add('hidden'); }
 
         fetchData();
-        setInterval(fetchData, 30000); // 30 saniyede bir arkadan kontrol et
     </script>
 </body>
 </html>
