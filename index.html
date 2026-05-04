@@ -250,4 +250,42 @@
             document.getElementById('modal-title').innerText = 'Görevi Düzenle';
             document.getElementById('task-title').value = task.title;
             document.getElementById('task-desc').value = task.desc;
-            document.getElementById('task-date').
+            document.getElementById('task-date').value = task.date;
+            document.getElementById('task-user').value = task.user;
+            document.getElementById('modal').classList.remove('hidden');
+        }
+
+        function saveTask() {
+            const id = document.getElementById('edit-id').value;
+            const title = document.getElementById('task-title').value;
+            if (!title) return alert("Başlık gerekli.");
+            const tData = {
+                id: id || Date.now().toString(),
+                title, desc: document.getElementById('task-desc').value,
+                date: document.getElementById('task-date').value,
+                user: document.getElementById('task-user').value,
+                status: id ? tasks.find(x => x.id === id).status : currentStatus,
+                archived: id ? tasks.find(x => x.id === id).archived : false
+            };
+            if (id) { const idx = tasks.findIndex(x => x.id === id); tasks[idx] = tData; }
+            else { tasks.push(tData); }
+            closeModal(); pushData();
+        }
+
+        function switchTab(t) {
+            activeTab = t;
+            document.getElementById('board-view').classList.toggle('hidden', t !== 'board');
+            document.getElementById('archive-view').classList.toggle('hidden', t !== 'archive');
+            document.getElementById('nav-board').classList.toggle('active-nav', t === 'board');
+            document.getElementById('nav-archive').classList.toggle('active-nav', t === 'archive');
+            render();
+        }
+
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+        function deleteTask(id) { if(confirm('Silmek istiyor musunuz?')) { tasks = tasks.filter(x => x.id !== id); pushData(); } }
+        function restoreTask(id) { const t = tasks.find(x => x.id === id); if(t) { t.archived = false; t.status = 'Todo'; pushData(); } }
+
+        fetchData();
+    </script>
+</body>
+</html>
