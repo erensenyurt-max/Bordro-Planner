@@ -2,130 +2,188 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Bordro Planner Pro - Stabil</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planner Pro - Full Sync</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background: #F1F5F9; }
-        .kanban-col { min-width: 300px; max-width: 300px; height: 85vh; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
+        .kanban-col { min-width: 320px; max-width: 320px; min-height: 70vh; }
+        .dragging { opacity: 0.5; transform: scale(0.95); }
+        .active-tab { background-color: #4F46E5; color: white; }
     </style>
 </head>
-<body class="p-6">
-    <div id="loader" class="fixed inset-0 bg-white/90 flex flex-col items-center justify-center z-50">
-        <div class="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p class="text-indigo-600 font-bold">Veriler Senkronize Ediliyor...</p>
-    </div>
-
-    <div class="max-w-[1400px] mx-auto">
-        <header class="flex justify-between items-center mb-10 bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+<body class="p-4 md:p-8">
+    <div id="app" class="max-w-[1440px] mx-auto">
+        <header class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-wrap justify-between items-center mb-8 gap-4">
             <div class="flex items-center gap-6">
-                <h1 class="text-2xl font-black text-indigo-600 tracking-tighter">PLANNER PRO</h1>
-                <select id="user-filter" onchange="render()" class="bg-slate-100 border-none rounded-xl px-4 py-2 text-sm font-bold outline-none cursor-pointer">
+                <h1 class="text-2xl font-black text-indigo-600 tracking-tighter uppercase">Planner Pro</h1>
+                <div class="flex bg-slate-100 p-1 rounded-2xl">
+                    <button onclick="switchTab('board')" id="btn-board" class="px-6 py-2 rounded-xl text-sm font-bold active-tab transition-all">Pano</button>
+                    <button onclick="switchTab('archive')" id="btn-archive" class="px-6 py-2 rounded-xl text-sm font-bold text-slate-500 transition-all">Arşiv</button>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <select id="user-filter" onchange="render()" class="bg-slate-50 border-none rounded-2xl px-6 py-3 text-sm font-bold outline-none cursor-pointer">
                     <option value="all">Tüm Ekip</option>
                     <option value="Eren">Eren Şenyurt</option>
                     <option value="Oguz">Oğuz Güleç</option>
                 </select>
+                <button onclick="openModal()" class="bg-indigo-600 text-white px-8 py-3 rounded-[1.5rem] font-bold shadow-lg shadow-indigo-100 hover:scale-105 transition-transform">+ Yeni İş Ata</button>
             </div>
-            <button onclick="openModal()" class="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:scale-105 transition-transform">+ Yeni İş</button>
         </header>
 
-        <div id="board" class="flex gap-6 overflow-x-auto pb-10"></div>
+        <div id="board-view" class="flex gap-6 overflow-x-auto pb-8 scrollbar-hide"></div>
+
+        <div id="archive-view" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
     </div>
 
-    <div id="modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50">
-        <div class="bg-white p-8 rounded-[2rem] w-[400px] shadow-2xl">
-            <h2 class="font-black text-xl mb-6 text-slate-800">İş Detayı</h2>
+    <div id="modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[1000]">
+        <div class="bg-white w-[450px] p-8 rounded-[2.5rem] shadow-2xl">
+            <h2 class="text-xl font-bold mb-6 text-slate-800">İş Kalemi Detayı</h2>
             <div class="space-y-4">
-                <input id="title" class="w-full bg-slate-50 border-none p-4 rounded-2xl outline-none focus:ring-2 ring-indigo-500" placeholder="İş Başlığı">
-                <select id="user" class="w-full bg-slate-50 border-none p-4 rounded-2xl outline-none font-bold">
-                    <option value="Eren">Eren Şenyurt</option>
-                    <option value="Oguz">Oğuz Güleç</option>
-                </select>
+                <input id="task-title" type="text" placeholder="İş Başlığı" class="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 ring-indigo-500 font-medium">
+                <textarea id="task-desc" placeholder="Açıklama" class="w-full p-4 bg-slate-50 border-none rounded-2xl h-28 outline-none focus:ring-2 ring-indigo-500"></textarea>
+                <div class="grid grid-cols-2 gap-4">
+                    <input id="task-date" type="date" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-slate-600">
+                    <select id="task-user" class="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold">
+                        <option value="Eren">Eren Şenyurt</option>
+                        <option value="Oguz">Oğuz Güleç</option>
+                    </select>
+                </div>
             </div>
             <div class="flex gap-4 mt-8">
-                <button onclick="closeModal()" class="flex-1 text-slate-400 font-bold">Vazgeç</button>
-                <button onclick="saveTask()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg">Kaydet</button>
+                <button onclick="closeModal()" class="flex-1 py-4 text-slate-400 font-bold">Vazgeç</button>
+                <button onclick="saveTask()" class="flex-1 bg-indigo-600 text-white py-4 rounded-2xl font-bold shadow-lg">Görevi Kaydet</button>
             </div>
         </div>
     </div>
 
     <script>
-        // SİZİN URL'NİZİ BURAYA DÜZENLEYEREK YAPIŞTIRDIM
+        // BURAYA KENDI URL'NIZI YAPIŞTIRIN
         const API_URL = "https://script.google.com/a/macros/s/AKfycbwzQKDqHUuPlsZvYn5PnNpYFKOcx6CKT0Sn_WNw7IPT-QMhgZ3Sjvnk9CDYgVk1CToY/exec";
 
-        let tasks = [];
+        let tasks = JSON.parse(localStorage.getItem('planner_tasks')) || [];
+        let activeTab = 'board';
 
         async function fetchData() {
-            document.getElementById('loader').style.display = 'flex';
             try {
-                const r = await fetch(API_URL + "?t=" + Date.now());
-                const d = await r.json();
-                tasks = Array.isArray(d) ? d : [];
-                render();
-            } catch (e) {
-                console.error("Veri alınamadı");
-                // Hata olsa bile ekranı boşaltma, eskileri göster
-                render();
-            }
-            document.getElementById('loader').style.display = 'none';
+                const response = await fetch(API_URL + "?t=" + Date.now());
+                const data = await response.json();
+                if (data && Array.isArray(data)) {
+                    tasks = data;
+                    localStorage.setItem('planner_tasks', JSON.stringify(tasks));
+                    render();
+                }
+            } catch (e) { console.error("Sheets verisi çekilemedi, yerel veri kullanılıyor."); render(); }
         }
 
-        async function pushData() {
+        async function sync() {
+            localStorage.setItem('planner_tasks', JSON.stringify(tasks));
             render();
-            await fetch(API_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify(tasks)
-            });
-            setTimeout(fetchData, 1500);
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify(tasks)
+                });
+            } catch (e) { console.error("Senkronizasyon hatası."); }
         }
 
         function render() {
-            const container = document.getElementById('board');
+            const board = document.getElementById('board-view');
+            const archive = document.getElementById('archive-view');
             const filter = document.getElementById('user-filter').value;
-            container.innerHTML = '';
             
-            const statuses = ['Backlog', 'Todo', 'InProgress', 'Done'];
-            
-            statuses.forEach(s => {
-                const colTasks = tasks.filter(t => t.status === s && (filter === 'all' || t.user === filter));
-                const col = document.createElement('div');
-                col.className = 'kanban-col bg-slate-200/40 p-4 rounded-[2rem] border border-slate-200/50';
-                col.innerHTML = `<h3 class="font-black text-slate-400 text-[10px] mb-6 uppercase tracking-[0.2em] text-center">${s} (${colTasks.length})</h3>`;
-                
-                colTasks.forEach(t => {
-                    const card = document.createElement('div');
-                    card.className = "bg-white p-5 rounded-2xl shadow-sm mb-4 border border-white hover:border-indigo-400 transition-all cursor-pointer";
-                    card.innerHTML = `
-                        <div class="font-bold text-sm text-slate-800 leading-snug mb-4">${t.title}</div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md uppercase">${t.user}</span>
-                            <span class="text-[9px] text-slate-400 font-bold">${t.date}</span>
-                        </div>`;
-                    col.appendChild(card);
+            board.innerHTML = ''; archive.innerHTML = '';
+
+            if (activeTab === 'board') {
+                board.classList.remove('hidden'); archive.classList.add('hidden');
+                const cols = ['Backlog', 'Todo', 'InProgress', 'Done'];
+                cols.forEach(status => {
+                    const colTasks = tasks.filter(t => t.status === status && !t.archived && (filter === 'all' || t.user === filter));
+                    const colDiv = document.createElement('div');
+                    colDiv.className = 'kanban-col bg-slate-200/40 p-5 rounded-[2rem] border border-slate-200/50';
+                    colDiv.innerHTML = `
+                        <div class="flex justify-between items-center mb-6 px-2">
+                            <span class="font-black text-[10px] text-slate-400 uppercase tracking-widest">${status} (${colTasks.length})</span>
+                            <button onclick="openModal('${status}')" class="text-slate-400 hover:text-indigo-600 font-bold text-xl">+</button>
+                        </div>
+                        <div id="${status}" class="space-y-4 min-h-[500px]" ondragover="event.preventDefault()" ondrop="drop(event, '${status}')"></div>
+                    `;
+                    board.appendChild(colDiv);
+                    colTasks.forEach(t => document.getElementById(status).appendChild(createCard(t)));
                 });
-                container.appendChild(col);
-            });
+            } else {
+                board.classList.add('hidden'); archive.classList.remove('hidden');
+                tasks.filter(t => t.archived && (filter === 'all' || t.user === filter)).forEach(t => {
+                    archive.appendChild(createCard(t, true));
+                });
+            }
+            lucide.createIcons();
+        }
+
+        function createCard(t, isArchive = false) {
+            const card = document.createElement('div');
+            card.className = "bg-white p-5 rounded-[1.8rem] shadow-sm border border-white hover:border-indigo-400 transition-all cursor-grab active:cursor-grabbing relative group";
+            card.draggable = true;
+            card.ondragstart = (e) => { e.dataTransfer.setData('text', t.id); card.classList.add('dragging'); };
+            card.ondragend = () => card.classList.remove('dragging');
+            
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <h4 class="font-bold text-slate-800 leading-snug">${t.title}</h4>
+                    <button onclick="deleteTask('${t.id}')" class="text-slate-200 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">✕</button>
+                </div>
+                <p class="text-xs text-slate-400 line-clamp-2 mb-4">${t.desc || 'Açıklama yok'}</p>
+                <div class="flex justify-between items-center">
+                    <span class="text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase">${t.user}</span>
+                    <span class="text-[9px] text-slate-400 font-bold italic">${t.date}</span>
+                </div>
+                ${!isArchive ? `<button onclick="archiveTask('${t.id}')" class="absolute -bottom-2 -right-2 bg-slate-800 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 scale-75 transition-all">📦</button>` 
+                : `<button onclick="restoreTask('${t.id}')" class="mt-4 w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold">Panoya Geri Al</button>`}
+            `;
+            return card;
+        }
+
+        function drop(e, newStatus) {
+            const id = e.dataTransfer.getData('text');
+            const task = tasks.find(t => t.id === id);
+            if (task) { task.status = newStatus; sync(); }
         }
 
         function saveTask() {
-            const title = document.getElementById('title').value;
-            if(!title) return alert("Başlık giriniz");
+            const title = document.getElementById('task-title').value;
+            if(!title) return alert("Lütfen başlık girin!");
             tasks.push({
                 id: Date.now().toString(),
                 title: title,
-                user: document.getElementById('user').value,
+                desc: document.getElementById('task-desc').value,
+                date: document.getElementById('task-date').value || new Date().toLocaleDateString(),
+                user: document.getElementById('task-user').value,
                 status: 'Todo',
-                date: new Date().toLocaleDateString('tr-TR')
+                archived: false
             });
-            closeModal();
-            pushData();
+            closeModal(); sync();
         }
+
+        function archiveTask(id) { const t = tasks.find(x => x.id === id); if(t) { t.archived = true; sync(); } }
+        function restoreTask(id) { const t = tasks.find(x => x.id === id); if(t) { t.archived = false; t.status = 'Todo'; sync(); } }
+        function deleteTask(id) { if(confirm('Silmek istediğine emin misin?')) { tasks = tasks.filter(t => t.id !== id); sync(); } }
 
         function openModal() { document.getElementById('modal').classList.remove('hidden'); }
         function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+        function switchTab(tab) {
+            activeTab = tab;
+            document.getElementById('btn-board').classList.toggle('active-tab', tab === 'board');
+            document.getElementById('btn-archive').classList.toggle('active-tab', tab === 'archive');
+            render();
+        }
 
         fetchData();
+        setInterval(fetchData, 60000); // 1 dakikada bir Sheets'ten güncelle
     </script>
 </body>
 </html>
